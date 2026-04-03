@@ -1,8 +1,16 @@
 import type { CreatedUser } from "@easy-devops/user-panel";
-import { afterEach, vi } from "vitest";
+import { vi } from "vitest";
 
 const ACCESS_KEY = "easy_devops_access_token";
 const REFRESH_KEY = "easy_devops_refresh_token";
+
+/** Shared admin fixture for integration-style page tests. */
+export const testAdminUser: CreatedUser = {
+  id: "1",
+  username: "admin",
+  email: "admin@example.com",
+  roles: ["admin"],
+};
 
 export function primeSession(access = "test-access", refresh = "test-refresh"): void {
   localStorage.setItem(ACCESS_KEY, access);
@@ -53,12 +61,6 @@ export function authTestCleanup(): void {
   clearSession();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
-}
-
-export function useAuthTestLifecycle(): void {
-  afterEach(() => {
-    authTestCleanup();
-  });
 }
 
 /** True for GET /.../users (collection), not GET /.../users/:id */

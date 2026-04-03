@@ -8,14 +8,8 @@ import {
   isUsersListGet,
   primeSession,
   stubFetchWithMe,
+  testAdminUser,
 } from "./test/authTestUtils";
-
-const adminUser = {
-  id: "1",
-  username: "admin",
-  email: "admin@example.com",
-  roles: ["admin"],
-};
 
 describe("App", () => {
   afterEach(() => {
@@ -37,7 +31,7 @@ describe("App", () => {
 
   it("renders home when session is valid", async () => {
     primeSession();
-    stubFetchWithMe(adminUser);
+    stubFetchWithMe(testAdminUser);
     render(
       <MemoryRouter>
         <AuthProvider>
@@ -54,7 +48,7 @@ describe("App", () => {
 
   it("renders users route for admin", async () => {
     primeSession();
-    stubFetchWithMe(adminUser, (url, init) => {
+    stubFetchWithMe(testAdminUser, (url, init) => {
       if (isUsersListGet(url, init)) {
         return {
           ok: true,
@@ -77,7 +71,7 @@ describe("App", () => {
 
   it("renders kafka route", async () => {
     primeSession();
-    stubFetchWithMe(adminUser);
+    stubFetchWithMe(testAdminUser);
     render(
       <MemoryRouter initialEntries={["/kafka"]}>
         <AuthProvider>

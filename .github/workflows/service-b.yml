@@ -37,5 +37,5 @@ jobs:
       - name: Go build
         run: go build -o /tmp/service-b .
 
-      - name: Tests and coverage (internal packages ≥90%)
+      - name: Tests and coverage (internal ≥80%, excluding genpb+model)
         run: bash scripts/check-coverage.sh

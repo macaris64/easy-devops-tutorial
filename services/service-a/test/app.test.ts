@@ -2,47 +2,7 @@ import request from "supertest";
 import * as grpc from "@grpc/grpc-js";
 import { createApp } from "../src/app";
 import type { GrpcBackend } from "../src/grpcBackend";
-
-const baseUser = {
-  id: "id-1",
-  username: "u",
-  email: "e@e.com",
-  roles: [] as string[],
-};
-
-function grpcMock(over: Partial<GrpcBackend> = {}): GrpcBackend {
-  const g: GrpcBackend = {
-    register: async () => ({ user: { ...baseUser } }),
-    login: async () => ({
-      accessToken: "a",
-      refreshToken: "r",
-      expiresInSeconds: "3600",
-      user: { ...baseUser },
-    }),
-    logout: async () => {},
-    me: async () => ({ user: { ...baseUser } }),
-    forgotPassword: async () => ({ message: "ok" }),
-    resetPassword: async () => {},
-    getUser: async (_h, id) => ({ ...baseUser, id }),
-    createUser: async (_h, u, e) => ({
-      ...baseUser,
-      id: "id-1",
-      username: u,
-      email: e,
-    }),
-    listUsers: async () => [{ ...baseUser }],
-    updateUser: async (_h, id) => ({ ...baseUser, id }),
-    deleteUser: async (_h, id) => ({ ...baseUser, id }),
-    listRoles: async () => [],
-    createRole: async () => ({ id: "r", name: "role" }),
-    getRole: async () => ({ id: "r", name: "role" }),
-    updateRole: async () => ({ id: "r", name: "role" }),
-    deleteRole: async () => ({ id: "r", name: "role" }),
-    assignUserRole: async () => {},
-    removeUserRole: async () => {},
-  };
-  return { ...g, ...over };
-}
+import { createGrpcBackendMock, defaultGrpcUser } from "./grpcBackendMock";
 
 function deps(
   over: Partial<{
@@ -65,7 +25,7 @@ function deps(
   }> = {},
 ) {
   return {
-    grpc: grpcMock(over.grpc ?? {}),
+    grpc: createGrpcBackendMock(over.grpc ?? {}),
     saveAuditLog: over.saveAuditLog ?? (async () => {}),
     listAuditLogs: over.listAuditLogs ?? (async () => []),
   };
@@ -123,7 +83,7 @@ describe("createApp", () => {
         grpc: {
           createUser: async (_h, _u, _e, pwd) => {
             seenPwd = pwd;
-            return { ...baseUser, id: "id-1" };
+            return { ...defaultGrpcUser, id: "id-1" };
           },
         },
       }),
@@ -363,7 +323,7 @@ describe("createApp", () => {
         grpc: {
           me: async (h) => {
             hdr = h;
-            return { user: baseUser };
+            return { user: defaultGrpcUser };
           },
         },
       }),

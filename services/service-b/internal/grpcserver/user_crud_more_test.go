@@ -13,7 +13,7 @@ import (
 )
 
 func TestUserServer_ListUpdateDelete(t *testing.T) {
-	db := testDBAuth(t)
+	db := openTestDB(t, "_auth")
 	s := NewUserServer(db, nil)
 	ctx := adminClaimsCtx(t, db)
 
@@ -36,7 +36,7 @@ func TestUserServer_ListUpdateDelete(t *testing.T) {
 }
 
 func TestUserServer_nonAdminDenied(t *testing.T) {
-	db := testDBAuth(t)
+	db := openTestDB(t, "_auth")
 	s := NewUserServer(db, nil)
 	var ru model.Role
 	if err := db.Where("name = ?", model.RoleUser).First(&ru).Error; err != nil {
@@ -54,7 +54,7 @@ func TestUserServer_nonAdminDenied(t *testing.T) {
 }
 
 func TestUserServer_GetUser_self(t *testing.T) {
-	db := testDBAuth(t)
+	db := openTestDB(t, "_auth")
 	s := NewUserServer(db, nil)
 	var ru model.Role
 	_ = db.Where("name = ?", model.RoleUser).First(&ru).Error

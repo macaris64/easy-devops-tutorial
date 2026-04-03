@@ -3,7 +3,6 @@ package grpcserver
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -14,33 +13,15 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
 	"easy-devops-tutorial/service-b/internal/auth"
 	userv1 "easy-devops-tutorial/service-b/internal/genpb/user/v1"
 	"easy-devops-tutorial/service-b/internal/grpcauth"
 	"easy-devops-tutorial/service-b/internal/model"
-	"easy-devops-tutorial/service-b/internal/seed"
 )
 
 const bufSize = 1024 * 1024
-
-func testDBFull(t *testing.T) *gorm.DB {
-	t.Helper()
-	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", t.Name())
-	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := db.AutoMigrate(&model.User{}, &model.Role{}, &model.RefreshToken{}, &model.PasswordResetToken{}); err != nil {
-		t.Fatal(err)
-	}
-	if err := seed.EnsureRoles(db); err != nil {
-		t.Fatal(err)
-	}
-	return db
-}
 
 func adminUser(t *testing.T, db *gorm.DB) (id string) {
 	t.Helper()
@@ -114,7 +95,7 @@ func startUserServer(t *testing.T, db *gorm.DB, pub UserEventPublisher) (*bufcon
 }
 
 func TestGetUser_notFound(t *testing.T) {
-	db := testDBFull(t)
+	db := openTestDB(t, "")
 	uid := adminUser(t, db)
 	lis, _ := startUserServer(t, db, nil)
 	client := dialUserClient(t, lis)
@@ -130,7 +111,7 @@ func TestGetUser_notFound(t *testing.T) {
 }
 
 func TestGetUser_invalid(t *testing.T) {
-	db := testDBFull(t)
+	db := openTestDB(t, "")
 	uid := adminUser(t, db)
 	lis, _ := startUserServer(t, db, nil)
 	client := dialUserClient(t, lis)
@@ -143,7 +124,7 @@ func TestGetUser_invalid(t *testing.T) {
 }
 
 func TestCreateUser_and_GetUser(t *testing.T) {
-	db := testDBFull(t)
+	db := openTestDB(t, "")
 	adminID := adminUser(t, db)
 	pub := &mockPublisher{}
 	lis, _ := startUserServer(t, db, pub)
@@ -174,7 +155,7 @@ func TestCreateUser_and_GetUser(t *testing.T) {
 }
 
 func TestCreateUser_invalid(t *testing.T) {
-	db := testDBFull(t)
+	db := openTestDB(t, "")
 	adminID := adminUser(t, db)
 	lis, _ := startUserServer(t, db, nil)
 	client := dialUserClient(t, lis)
@@ -187,7 +168,7 @@ func TestCreateUser_invalid(t *testing.T) {
 }
 
 func TestGetUser_databaseError(t *testing.T) {
-	db := testDBFull(t)
+	db := openTestDB(t, "")
 	if err := db.Migrator().DropTable(&model.User{}); err != nil {
 		t.Fatal(err)
 	}
@@ -200,7 +181,7 @@ func TestGetUser_databaseError(t *testing.T) {
 }
 
 func TestCreateUser_duplicate(t *testing.T) {
-	db := testDBFull(t)
+	db := openTestDB(t, "")
 	s := NewUserServer(db, nil)
 	ctx := grpcauth.WithClaims(context.Background(), &grpcauth.Claims{UserID: "a", Roles: []string{model.RoleAdmin}})
 	_, err := s.CreateUser(ctx, &userv1.CreateUserRequest{Username: "dup", Email: "dup@x.com"})
@@ -216,7 +197,7 @@ func TestCreateUser_duplicate(t *testing.T) {
 func TestCreateUser_kafkaNonStrict_ignoresPublishError(t *testing.T) {
 	t.Setenv("KAFKA_STRICT", "")
 
-	db := testDBFull(t)
+	db := openTestDB(t, "")
 	adminID := adminUser(t, db)
 	pub := &mockPublisher{err: errors.New("kafka unavailable")}
 	lis, _ := startUserServer(t, db, pub)
@@ -237,7 +218,7 @@ func TestCreateUser_kafkaNonStrict_ignoresPublishError(t *testing.T) {
 func TestCreateUser_kafkaStrict(t *testing.T) {
 	t.Setenv("KAFKA_STRICT", "1")
 
-	db := testDBFull(t)
+	db := openTestDB(t, "")
 	adminID := adminUser(t, db)
 	pub := &mockPublisher{err: errors.New("kafka down")}
 	lis, _ := startUserServer(t, db, pub)

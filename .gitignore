@@ -1,4 +1,5 @@
 node_modules/
+services/service-c/build/
 dist/
 storybook-static/
 coverage/

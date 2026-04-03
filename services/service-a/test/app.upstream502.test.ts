@@ -1,47 +1,7 @@
 import request from "supertest";
 import { createApp } from "../src/app";
 import type { GrpcBackend } from "../src/grpcBackend";
-
-const baseUser = {
-  id: "id-1",
-  username: "u",
-  email: "e@e.com",
-  roles: [] as string[],
-};
-
-function grpcMock(over: Partial<GrpcBackend> = {}): GrpcBackend {
-  const g: GrpcBackend = {
-    register: async () => ({ user: { ...baseUser } }),
-    login: async () => ({
-      accessToken: "a",
-      refreshToken: "r",
-      expiresInSeconds: "3600",
-      user: { ...baseUser },
-    }),
-    logout: async () => {},
-    me: async () => ({ user: { ...baseUser } }),
-    forgotPassword: async () => ({ message: "ok" }),
-    resetPassword: async () => {},
-    getUser: async (_h, id) => ({ ...baseUser, id }),
-    createUser: async (_h, u, e) => ({
-      ...baseUser,
-      id: "id-1",
-      username: u,
-      email: e,
-    }),
-    listUsers: async () => [{ ...baseUser }],
-    updateUser: async (_h, id) => ({ ...baseUser, id }),
-    deleteUser: async (_h, id) => ({ ...baseUser, id }),
-    listRoles: async () => [],
-    createRole: async () => ({ id: "r", name: "role" }),
-    getRole: async () => ({ id: "r", name: "role" }),
-    updateRole: async () => ({ id: "r", name: "role" }),
-    deleteRole: async () => ({ id: "r", name: "role" }),
-    assignUserRole: async () => {},
-    removeUserRole: async () => {},
-  };
-  return { ...g, ...over };
-}
+import { createGrpcBackendMock } from "./grpcBackendMock";
 
 function boom(): never {
   throw new Error("upstream");
@@ -49,7 +9,7 @@ function boom(): never {
 
 describe("createApp upstream 502 paths", () => {
   const deps = (grpc: Partial<GrpcBackend>) => ({
-    grpc: grpcMock(grpc),
+    grpc: createGrpcBackendMock(grpc),
     saveAuditLog: async () => {},
     listAuditLogs: async () => [],
   });

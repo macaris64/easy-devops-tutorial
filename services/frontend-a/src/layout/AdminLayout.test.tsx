@@ -8,15 +8,9 @@ import {
   authTestCleanup,
   primeSession,
   stubFetchWithMe,
+  testAdminUser,
 } from "../test/authTestUtils";
 import { AdminLayout } from "./AdminLayout";
-
-const adminUser = {
-  id: "1",
-  username: "admin",
-  email: "admin@example.com",
-  roles: ["admin"],
-};
 
 describe("AdminLayout", () => {
   afterEach(() => {
@@ -25,7 +19,7 @@ describe("AdminLayout", () => {
 
   it("marks active nav link and shows Users for admin", async () => {
     primeSession();
-    stubFetchWithMe(adminUser, (url, init) => {
+    stubFetchWithMe(testAdminUser, (url, init) => {
       if (url.includes("/auth/logout") && init?.method === "POST") {
         return { ok: true, json: () => Promise.resolve({}) } as Response;
       }

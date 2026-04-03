@@ -2,14 +2,12 @@ package grpcserver
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
 	"easy-devops-tutorial/service-b/internal/auth"
@@ -17,24 +15,7 @@ import (
 	rolev1 "easy-devops-tutorial/service-b/internal/genpb/role/v1"
 	"easy-devops-tutorial/service-b/internal/grpcauth"
 	"easy-devops-tutorial/service-b/internal/model"
-	"easy-devops-tutorial/service-b/internal/seed"
 )
-
-func testDBAuth(t *testing.T) *gorm.DB {
-	t.Helper()
-	dsn := fmt.Sprintf("file:%s_auth?mode=memory&cache=shared", t.Name())
-	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := db.AutoMigrate(&model.User{}, &model.Role{}, &model.RefreshToken{}, &model.PasswordResetToken{}); err != nil {
-		t.Fatal(err)
-	}
-	if err := seed.EnsureRoles(db); err != nil {
-		t.Fatal(err)
-	}
-	return db
-}
 
 func adminClaimsCtx(t *testing.T, db *gorm.DB) context.Context {
 	t.Helper()
@@ -60,7 +41,7 @@ func adminClaimsCtx(t *testing.T, db *gorm.DB) context.Context {
 }
 
 func TestAuthServer_RegisterLoginLogoutMe(t *testing.T) {
-	db := testDBAuth(t)
+	db := openTestDB(t, "_auth")
 	signer := auth.NewJWTSigner("t", "", "")
 	as := NewAuthServer(db, signer, time.Minute, time.Hour, nil)
 
@@ -92,7 +73,7 @@ func TestAuthServer_RegisterLoginLogoutMe(t *testing.T) {
 }
 
 func TestAuthServer_Register_validation(t *testing.T) {
-	db := testDBAuth(t)
+	db := openTestDB(t, "_auth")
 	as := NewAuthServer(db, auth.NewJWTSigner("t", "", ""), time.Minute, time.Hour, nil)
 	_, err := as.Register(context.Background(), &authv1.RegisterRequest{Username: "", Email: "a@a", Password: "password12"})
 	if status.Code(err) != codes.InvalidArgument {
@@ -102,7 +83,7 @@ func TestAuthServer_Register_validation(t *testing.T) {
 
 func TestAuthServer_ForgotResetPassword(t *testing.T) {
 	t.Setenv("PASSWORD_RESET_DEV_RETURN_TOKEN", "1")
-	db := testDBAuth(t)
+	db := openTestDB(t, "_auth")
 	signer := auth.NewJWTSigner("t", "", "")
 
 	as := NewAuthServer(db, signer, time.Minute, time.Hour, nil)
@@ -121,7 +102,7 @@ func TestAuthServer_ForgotResetPassword(t *testing.T) {
 }
 
 func TestRoleServer_CRUD(t *testing.T) {
-	db := testDBAuth(t)
+	db := openTestDB(t, "_auth")
 	rs := NewRoleServer(db)
 	ctx := adminClaimsCtx(t, db)
 
@@ -148,7 +129,7 @@ func TestRoleServer_CRUD(t *testing.T) {
 }
 
 func TestRoleServer_AssignRemoveUserRole(t *testing.T) {
-	db := testDBAuth(t)
+	db := openTestDB(t, "_auth")
 	rs := NewRoleServer(db)
 	ctx := adminClaimsCtx(t, db)
 

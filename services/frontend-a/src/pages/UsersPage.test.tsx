@@ -8,15 +8,9 @@ import {
   isUsersListGet,
   primeSession,
   stubFetchWithMe,
+  testAdminUser,
 } from "../test/authTestUtils";
 import { UsersPage } from "./UsersPage";
-
-const adminUser = {
-  id: "1",
-  username: "admin",
-  email: "admin@example.com",
-  roles: ["admin"],
-};
 
 describe("UsersPage", () => {
   afterEach(() => {
@@ -26,7 +20,7 @@ describe("UsersPage", () => {
   it("submits create through gateway for admin", async () => {
     const user = userEvent.setup();
     primeSession();
-    stubFetchWithMe(adminUser, (url, init) => {
+    stubFetchWithMe(testAdminUser, (url, init) => {
       if (isUsersListGet(url, init)) {
         return {
           ok: true,
