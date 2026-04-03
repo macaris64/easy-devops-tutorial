@@ -1,5 +1,16 @@
+import cors from "cors";
+import type { CorsOptions } from "cors";
 import express, { Request, Response } from "express";
 import * as grpc from "@grpc/grpc-js";
+
+export interface AuditLogRow {
+  id: string;
+  path: string;
+  method: string;
+  createdAt: string;
+  payload: Record<string, unknown>;
+  createdUserId?: string;
+}
 
 export interface AppDeps {
   createUser: (username: string, email: string) => Promise<{
@@ -13,17 +24,32 @@ export interface AppDeps {
     payload: Record<string, unknown>;
     createdUserId?: string;
   }) => Promise<void>;
+  listAuditLogs: () => Promise<AuditLogRow[]>;
 }
 
 /**
- * HTTP API: health check and user creation (delegates to gRPC via deps).
+ * HTTP API: health check, audit log listing, and user creation (delegates to gRPC via deps).
  */
-export function createApp(deps: AppDeps): express.Application {
+export function createApp(
+  deps: AppDeps,
+  corsOptions: CorsOptions = { origin: true },
+): express.Application {
   const app = express();
+  app.use(cors(corsOptions));
   app.use(express.json());
 
   app.get("/health", (_req: Request, res: Response) => {
     res.json({ status: "ok", service: "service-a" });
+  });
+
+  app.get("/audit-logs", async (_req: Request, res: Response) => {
+    try {
+      const rows = await deps.listAuditLogs();
+      res.json(rows);
+    } catch (e) {
+      console.error("GET /audit-logs error:", e);
+      res.status(500).json({ error: "failed to load audit logs" });
+    }
   });
 
   app.post("/users", async (req: Request, res: Response) => {

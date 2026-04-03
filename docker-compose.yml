@@ -36,6 +36,7 @@ services:
       MONGO_URI: ${MONGO_URI:-mongodb://mongodb:27017/service_a}
       GRPC_HOST: ${GRPC_HOST:-service-b}
       GRPC_PORT: ${GRPC_PORT:-50051}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
     ports:
       - "${SERVICE_A_HTTP_PORT:-3000}:3000"
     depends_on:
@@ -61,5 +62,40 @@ services:
         condition: service_healthy
       kafka-init:
         condition: service_completed_successfully
+    networks:
+      - app-network
+
+  frontend-a:
+    build:
+      context: .
+      dockerfile: services/frontend-a/Dockerfile
+      args:
+        VITE_API_PREFIX: ${FRONTEND_A_VITE_API_PREFIX:-/api}
+    container_name: frontend-a
+    ports:
+      - "${FRONTEND_A_PORT:-4173}:80"
+    depends_on:
+      service-a:
+        condition: service_started
+    networks:
+      - app-network
+
+  frontend-b:
+    build:
+      context: .
+      dockerfile: services/frontend-b/Dockerfile
+    container_name: frontend-b
+    ports:
+      - "${FRONTEND_B_PORT:-6006}:80"
+    networks:
+      - app-network
+
+  frontend-c:
+    build:
+      context: .
+      dockerfile: services/frontend-c/Dockerfile
+    container_name: frontend-c
+    ports:
+      - "${FRONTEND_C_PORT:-6007}:80"
     networks:
       - app-network

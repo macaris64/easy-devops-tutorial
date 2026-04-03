@@ -1,0 +1,100 @@
+:root {
+  font-family: system-ui, sans-serif;
+  line-height: 1.5;
+  color: #0f172a;
+  background: #f8fafc;
+}
+
+body {
+  margin: 0;
+}
+
+.admin-root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-header {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0.75rem 1.25rem;
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+.admin-brand {
+  font-size: 1.1rem;
+}
+
+.admin-nav {
+  display: flex;
+  gap: 1rem;
+}
+
+.admin-nav-link {
+  color: #94a3b8;
+  text-decoration: none;
+}
+
+.admin-nav-link.active {
+  color: #f8fafc;
+  font-weight: 600;
+}
+
+.admin-main {
+  padding: 1.25rem;
+  max-width: 960px;
+}
+
+.field {
+  margin-bottom: 0.75rem;
+}
+
+.field label {
+  display: block;
+  font-size: 0.875rem;
+  margin-bottom: 0.25rem;
+}
+
+.field input {
+  width: 100%;
+  max-width: 320px;
+  padding: 0.35rem 0.5rem;
+}
+
+.form-error {
+  color: #b91c1c;
+  font-size: 0.875rem;
+}
+
+.log-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.log-table th,
+.log-table td {
+  border: 1px solid #e2e8f0;
+  padding: 0.35rem 0.5rem;
+  text-align: left;
+}
+
+.log-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.log-panel-empty {
+  color: #64748b;
+}
+
+.user-management-panel h2,
+.log-panel h2 {
+  margin-top: 0;
+}

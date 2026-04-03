@@ -1,9 +1,13 @@
 # Shared infrastructure: MongoDB, PostgreSQL, Kafka, Zookeeper, Kafka UI.
 # Containers reach each other by name on app-network.
+#
+# Default Mongo/Postgres images use AWS ECR Public copies of Docker Official Images
+# to avoid Docker Hub anonymous rate limits (toomanyrequests). Override with
+# MONGO_IMAGE / POSTGRES_IMAGE in .env if you prefer docker.io.
 
 services:
   mongodb:
-    image: mongo:7
+    image: ${MONGO_IMAGE:-public.ecr.aws/docker/library/mongo:7}
     container_name: mongodb
     restart: unless-stopped
     environment:
@@ -19,7 +23,7 @@ services:
       retries: 5
 
   postgres:
-    image: postgres:16-alpine
+    image: ${POSTGRES_IMAGE:-public.ecr.aws/docker/library/postgres:16-alpine}
     container_name: postgres
     restart: unless-stopped
     environment:
@@ -92,7 +96,7 @@ services:
       - app-network
 
   kafka-ui:
-    image: provectuslabs/kafka-ui:latest
+    image: ${KAFKA_UI_IMAGE:-provectuslabs/kafka-ui:v0.7.2}
     container_name: kafka-ui
     restart: unless-stopped
     depends_on:

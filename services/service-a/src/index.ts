@@ -12,12 +12,38 @@ const grpcAddress = `${grpcHost}:${grpcPort}`;
 
 const createUser = buildCreateUserFromEnv();
 
-const app = createApp({
-  createUser,
-  saveAuditLog: async (entry) => {
-    await AuditLog.create(entry);
+const corsRaw = process.env.CORS_ORIGIN;
+const corsOptions =
+  corsRaw === "*" || corsRaw === undefined || corsRaw === ""
+    ? { origin: true as const }
+    : { origin: corsRaw.split(",").map((s) => s.trim()).filter(Boolean) };
+
+const app = createApp(
+  {
+    createUser,
+    saveAuditLog: async (entry) => {
+      await AuditLog.create(entry);
+    },
+    listAuditLogs: async () => {
+      const docs = await AuditLog.find()
+        .sort({ createdAt: -1 })
+        .limit(100)
+        .lean();
+      return docs.map((d) => ({
+        id: String(d._id),
+        path: d.path,
+        method: d.method,
+        createdAt:
+          d.createdAt instanceof Date
+            ? d.createdAt.toISOString()
+            : new Date(d.createdAt as string).toISOString(),
+        payload: d.payload as Record<string, unknown>,
+        createdUserId: d.createdUserId,
+      }));
+    },
   },
-});
+  corsOptions,
+);
 
 async function main(): Promise<void> {
   await mongoose.connect(mongoUri);

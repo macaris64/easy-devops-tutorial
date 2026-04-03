@@ -2,11 +2,14 @@ import request from "supertest";
 import * as grpc from "@grpc/grpc-js";
 import { createApp } from "../src/app";
 
+const emptyAudit = async (): Promise<never[]> => [];
+
 describe("createApp", () => {
   it("GET /health", async () => {
     const app = createApp({
       createUser: async () => ({ id: "x", username: "x", email: "x" }),
       saveAuditLog: async () => {},
+      listAuditLogs: emptyAudit,
     });
     const res = await request(app).get("/health");
     expect(res.status).toBe(200);
@@ -17,6 +20,7 @@ describe("createApp", () => {
     const app = createApp({
       createUser: async () => ({ id: "x", username: "x", email: "x" }),
       saveAuditLog: async () => {},
+      listAuditLogs: emptyAudit,
     });
     const res = await request(app)
       .post("/users")
@@ -28,6 +32,7 @@ describe("createApp", () => {
     const app = createApp({
       createUser: async () => ({ id: "x", username: "x", email: "x" }),
       saveAuditLog: async () => {},
+      listAuditLogs: emptyAudit,
     });
     const res = await request(app)
       .post("/users")
@@ -46,6 +51,7 @@ describe("createApp", () => {
       saveAuditLog: async (e) => {
         audits.push(e);
       },
+      listAuditLogs: emptyAudit,
     });
     const res = await request(app)
       .post("/users")
@@ -64,6 +70,7 @@ describe("createApp", () => {
         throw e;
       },
       saveAuditLog: async () => {},
+      listAuditLogs: emptyAudit,
     });
     const res = await request(app)
       .post("/users")
@@ -80,6 +87,7 @@ describe("createApp", () => {
         throw e;
       },
       saveAuditLog: async () => {},
+      listAuditLogs: emptyAudit,
     });
     const res = await request(app)
       .post("/users")
@@ -93,6 +101,7 @@ describe("createApp", () => {
         throw new Error("boom");
       },
       saveAuditLog: async () => {},
+      listAuditLogs: emptyAudit,
     });
     const res = await request(app)
       .post("/users")
@@ -106,10 +115,44 @@ describe("createApp", () => {
         throw Object.assign(new Error(), { message: "" });
       },
       saveAuditLog: async () => {},
+      listAuditLogs: emptyAudit,
     });
     const res = await request(app)
       .post("/users")
       .send({ username: "u", email: "e@e.com" });
     expect(res.status).toBe(502);
+  });
+
+  it("GET /audit-logs returns rows", async () => {
+    const app = createApp({
+      createUser: async () => ({ id: "x", username: "x", email: "x" }),
+      saveAuditLog: async () => {},
+      listAuditLogs: async () => [
+        {
+          id: "1",
+          path: "/users",
+          method: "POST",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          payload: {},
+        },
+      ],
+    });
+    const res = await request(app).get("/audit-logs");
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0].path).toBe("/users");
+  });
+
+  it("GET /audit-logs maps errors to 500", async () => {
+    const app = createApp({
+      createUser: async () => ({ id: "x", username: "x", email: "x" }),
+      saveAuditLog: async () => {},
+      listAuditLogs: async () => {
+        throw new Error("db down");
+      },
+    });
+    const res = await request(app).get("/audit-logs");
+    expect(res.status).toBe(500);
+    expect(res.body.error).toBe("failed to load audit logs");
   });
 });
