@@ -48,4 +48,68 @@ describe("UserManagementPanel", () => {
       );
     });
   });
+
+  it("loads directory when listUsers is provided", async () => {
+    const listUsers = vi.fn().mockResolvedValue([
+      { id: "u1", username: "a", email: "a@a.com" },
+    ]);
+    render(
+      <UserManagementPanel createUser={vi.fn().mockResolvedValue({ id: "n", username: "b", email: "b@b.com" })} listUsers={listUsers} />,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId("user-list-row-u1")).toBeInTheDocument();
+    });
+  });
+
+  it("updates a user when updateUser is provided", async () => {
+    const user = userEvent.setup();
+    const listUsers = vi.fn().mockResolvedValue([
+      { id: "u1", username: "a", email: "a@a.com" },
+    ]);
+    const updateUser = vi.fn().mockResolvedValue({
+      id: "u1",
+      username: "b",
+      email: "a@a.com",
+    });
+    render(
+      <UserManagementPanel
+        createUser={vi.fn().mockResolvedValue({ id: "n", username: "x", email: "x@x.com" })}
+        listUsers={listUsers}
+        updateUser={updateUser}
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Edit" })).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    await user.clear(screen.getByLabelText(/edit username/i));
+    await user.type(screen.getByLabelText(/edit username/i), "b");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      expect(updateUser).toHaveBeenCalledWith("u1", { username: "b" });
+    });
+  });
+
+  it("deletes a user when deleteUser is provided", async () => {
+    const user = userEvent.setup();
+    const listUsers = vi
+      .fn()
+      .mockResolvedValueOnce([{ id: "u1", username: "a", email: "a@a.com" }])
+      .mockResolvedValueOnce([]);
+    const deleteUser = vi.fn().mockResolvedValue(undefined);
+    render(
+      <UserManagementPanel
+        createUser={vi.fn().mockResolvedValue({ id: "n", username: "x", email: "x@x.com" })}
+        listUsers={listUsers}
+        deleteUser={deleteUser}
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    await waitFor(() => {
+      expect(deleteUser).toHaveBeenCalledWith("u1");
+    });
+  });
 });

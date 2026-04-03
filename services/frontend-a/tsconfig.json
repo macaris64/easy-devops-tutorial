@@ -14,7 +14,11 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "types": ["vitest/globals"]
+    "types": ["vitest/globals"],
+    "baseUrl": ".",
+    "paths": {
+      "@easy-devops/user-panel": ["../frontend-c/src/index.ts"]
+    }
   },
   "include": ["src", "global.d.ts", "vitest.setup.ts"]
 }

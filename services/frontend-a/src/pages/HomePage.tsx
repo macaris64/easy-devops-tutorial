@@ -5,8 +5,9 @@ export function HomePage(): ReactElement {
     <section>
       <h1>Admin dashboard</h1>
       <p>
-        Manage users and inspect audit logs. Microfrontend components are
-        provided by the user panel and log panel packages.
+        Create and look up users, inspect HTTP audit logs, and open Kafka UI
+        to view topics and messages. Shared UI comes from the user panel and
+        log panel packages.
       </p>
     </section>
   );

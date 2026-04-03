@@ -1,6 +1,7 @@
 import * as grpc from "@grpc/grpc-js";
 import {
   createCreateUserFn,
+  createGetUserFn,
   defaultProtoPath,
 } from "../src/grpcUser";
 
@@ -27,7 +28,8 @@ describe("grpcUser", () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (this as any).CreateUser = (
         req: { username: string; email: string },
-        cb: (err: grpc.ServiceError | null, res: unknown) => void
+        _md: grpc.Metadata,
+        cb: (err: grpc.ServiceError | null, res: unknown) => void,
       ) => {
         cb(null, { id: "1", username: req.username, email: req.email });
       };
@@ -45,7 +47,8 @@ describe("grpcUser", () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (this as any).CreateUser = (
         _req: unknown,
-        cb: (err: grpc.ServiceError | null, res: unknown) => void
+        _md: grpc.Metadata,
+        cb: (err: grpc.ServiceError | null, res: unknown) => void,
       ) => {
         cb(Object.assign(new Error("fail"), { code: 3 }) as grpc.ServiceError, null);
       };
@@ -55,5 +58,46 @@ describe("grpcUser", () => {
       "localhost:9"
     );
     await expect(fn("a", "b@c.com")).rejects.toThrow("fail");
+  });
+
+  it("createGetUserFn invokes GetUser callback", async () => {
+    function MockCtor(this: unknown, _addr: string, _cred: grpc.ChannelCredentials) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (this as any).GetUser = (
+        req: { id: string },
+        _md: grpc.Metadata,
+        cb: (err: grpc.ServiceError | null, res: unknown) => void,
+      ) => {
+        cb(null, {
+          id: req.id,
+          username: "alice",
+          email: "a@b.com",
+        });
+      };
+    }
+    const fn = createGetUserFn(
+      MockCtor as unknown as grpc.ServiceClientConstructor,
+      "localhost:9"
+    );
+    const u = await fn("uid-1");
+    expect(u).toEqual({ id: "uid-1", username: "alice", email: "a@b.com" });
+  });
+
+  it("createGetUserFn propagates gRPC errors", async () => {
+    function MockCtor(this: unknown, _addr: string, _cred: grpc.ChannelCredentials) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (this as any).GetUser = (
+        _req: unknown,
+        _md: grpc.Metadata,
+        cb: (err: grpc.ServiceError | null, res: unknown) => void,
+      ) => {
+        cb(Object.assign(new Error("nf"), { code: 5 }) as grpc.ServiceError, null);
+      };
+    }
+    const fn = createGetUserFn(
+      MockCtor as unknown as grpc.ServiceClientConstructor,
+      "localhost:9"
+    );
+    await expect(fn("x")).rejects.toThrow("nf");
   });
 });

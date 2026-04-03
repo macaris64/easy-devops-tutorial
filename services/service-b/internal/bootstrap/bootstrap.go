@@ -5,26 +5,29 @@ import (
 	"log"
 	"net"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 
 	"google.golang.org/grpc"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
-	pb "easy-devops-tutorial/service-b/pb"
+	authv1 "easy-devops-tutorial/service-b/internal/genpb/auth/v1"
+	rolev1 "easy-devops-tutorial/service-b/internal/genpb/role/v1"
+	userv1 "easy-devops-tutorial/service-b/internal/genpb/user/v1"
+	"easy-devops-tutorial/service-b/internal/auth"
 	"easy-devops-tutorial/service-b/internal/grpcserver"
 	kafkaprod "easy-devops-tutorial/service-b/internal/kafka"
 	"easy-devops-tutorial/service-b/internal/model"
+	"easy-devops-tutorial/service-b/internal/seed"
 )
 
 // Options configures Run; nil-safe defaults are applied for production.
 type Options struct {
-	// OpenDB opens the database (defaults to PostgreSQL via GORM).
-	OpenDB func(dsn string) (*gorm.DB, error)
-	// Listen creates the TCP listener (defaults to net.Listen).
-	Listen func(network, address string) (net.Listener, error)
-	// SkipServe exits after wiring the server (for unit tests).
+	OpenDB    func(dsn string) (*gorm.DB, error)
+	Listen    func(network, address string) (net.Listener, error)
 	SkipServe bool
 }
 
@@ -33,6 +36,35 @@ func Main() {
 	if err := Run(nil); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func jwtSecret() string {
+	s := os.Getenv("JWT_SECRET")
+	if s == "" {
+		log.Println("warning: JWT_SECRET empty — using insecure dev default")
+		return "insecure-dev-jwt-secret-change-me"
+	}
+	return s
+}
+
+func accessTTL() time.Duration {
+	sec := int64(900)
+	if v := os.Getenv("JWT_ACCESS_TTL_SECONDS"); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil && n > 0 {
+			sec = n
+		}
+	}
+	return time.Duration(sec) * time.Second
+}
+
+func refreshTTL() time.Duration {
+	h := int64(168)
+	if v := os.Getenv("JWT_REFRESH_TTL_HOURS"); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil && n > 0 {
+			h = n
+		}
+	}
+	return time.Duration(h) * time.Hour
 }
 
 // Run starts the gRPC server and blocks until Serve returns (unless SkipServe).
@@ -55,8 +87,19 @@ func Run(opts *Options) error {
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}
-	if migrateErr := db.AutoMigrate(&model.User{}); migrateErr != nil {
+	if migrateErr := db.AutoMigrate(
+		&model.User{},
+		&model.Role{},
+		&model.RefreshToken{},
+		&model.PasswordResetToken{},
+	); migrateErr != nil {
 		return fmt.Errorf("migrate: %w", migrateErr)
+	}
+	if err := seed.EnsureRoles(db); err != nil {
+		return fmt.Errorf("seed roles: %w", err)
+	}
+	if err := seed.BootstrapAdmin(db); err != nil {
+		return fmt.Errorf("bootstrap admin: %w", err)
 	}
 
 	var producer *kafkaprod.Producer
@@ -75,6 +118,21 @@ func Run(opts *Options) error {
 		log.Println("KAFKA_BROKERS empty — Kafka producer disabled")
 	}
 
+	signer := auth.NewJWTSigner(jwtSecret(), "service-b", "service-b")
+	access := accessTTL()
+	refresh := refreshTTL()
+
+	userSrv := grpcserver.NewUserServer(db, producer)
+	authSrv := grpcserver.NewAuthServer(db, signer, access, refresh, producer)
+	roleSrv := grpcserver.NewRoleServer(db)
+
+	intercept := grpcserver.AuthUnaryInterceptor(signer, grpcserver.PublicGRPCMethods())
+	s := grpc.NewServer(grpc.ChainUnaryInterceptor(intercept))
+
+	userv1.RegisterUserServiceServer(s, userSrv)
+	authv1.RegisterAuthServiceServer(s, authSrv)
+	rolev1.RegisterRoleServiceServer(s, roleSrv)
+
 	addr := os.Getenv("GRPC_LISTEN_ADDR")
 	if addr == "" {
 		addr = ":50051"
@@ -83,8 +141,6 @@ func Run(opts *Options) error {
 	if err != nil {
 		return fmt.Errorf("listen: %w", err)
 	}
-	s := grpc.NewServer()
-	pb.RegisterUserServiceServer(s, grpcserver.NewUserServer(db, producer))
 
 	log.Printf("gRPC server listening on %s", addr)
 	if opts.SkipServe {

@@ -18,6 +18,7 @@ body {
 .admin-header {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 1.5rem;
   padding: 0.75rem 1.25rem;
   background: #0f172a;
@@ -95,6 +96,94 @@ body {
 }
 
 .user-management-panel h2,
+.user-lookup-section h2,
 .log-panel h2 {
   margin-top: 0;
+}
+
+.user-lookup-section {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.user-lookup-hint {
+  color: #64748b;
+  font-size: 0.875rem;
+  margin-top: 0;
+}
+
+.user-lookup-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+}
+
+.user-lookup-row label {
+  width: 100%;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.user-lookup-row input {
+  flex: 1;
+  min-width: 200px;
+  max-width: 360px;
+  padding: 0.35rem 0.5rem;
+}
+
+.admin-profile {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+}
+
+.admin-logout {
+  background: #334155;
+  color: #f8fafc;
+  border: 1px solid #475569;
+  border-radius: 0.25rem;
+  padding: 0.35rem 0.65rem;
+  cursor: pointer;
+}
+
+.admin-logout:hover {
+  background: #475569;
+}
+
+.login-page {
+  max-width: 360px;
+  margin: 2rem auto;
+  padding: 1.25rem;
+}
+
+.login-form button {
+  margin-top: 0.5rem;
+}
+
+.auth-loading {
+  padding: 1.25rem;
+}
+
+.admin-user-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  margin-top: 0.75rem;
+}
+
+.admin-user-table th,
+.admin-user-table td {
+  border: 1px solid #e2e8f0;
+  padding: 0.35rem 0.5rem;
+  text-align: left;
+}
+
+.users-admin-only {
+  color: #64748b;
+  margin-bottom: 1rem;
 }

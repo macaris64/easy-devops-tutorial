@@ -18,7 +18,11 @@ COPY services/frontend-a/package.json services/frontend-a/package-lock.json ./
 RUN npm ci
 COPY services/frontend-a/ ./
 ARG VITE_API_PREFIX=/api
+ARG VITE_KAFKA_UI_URL=http://localhost:8080
+ARG VITE_USER_CREATED_TOPIC=user.created
 ENV VITE_API_PREFIX=${VITE_API_PREFIX}
+ENV VITE_KAFKA_UI_URL=${VITE_KAFKA_UI_URL}
+ENV VITE_USER_CREATED_TOPIC=${VITE_USER_CREATED_TOPIC}
 RUN npm run build
 
 FROM nginx:1.27-alpine AS runner

@@ -20,3 +20,24 @@ export const MockSuccess: Story = {
       }),
   },
 };
+
+export const WithDirectory: Story = {
+  args: {
+    createUser: (username, email) =>
+      Promise.resolve({
+        id: "new",
+        username,
+        email,
+      }),
+    listUsers: () =>
+      Promise.resolve([
+        { id: "1", username: "alice", email: "alice@example.com", roles: ["user"] },
+      ]),
+    updateUser: async (id, patch) => ({
+      id,
+      username: patch.username ?? "alice",
+      email: "alice@example.com",
+    }),
+    deleteUser: async () => undefined,
+  },
+};

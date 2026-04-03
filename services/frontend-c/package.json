@@ -15,8 +15,8 @@
   "sideEffects": false,
   "scripts": {
     "build": "vite build",
-    "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
+    "test": "vitest run --cache=false",
+    "test:coverage": "vitest run --coverage --cache=false",
     "lint": "eslint .",
     "storybook": "storybook dev -p 6007",
     "build-storybook": "storybook build -o storybook-static"

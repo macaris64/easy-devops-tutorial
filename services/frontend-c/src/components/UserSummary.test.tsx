@@ -23,4 +23,18 @@ describe("UserSummary", () => {
     expect(block).toHaveTextContent("pat");
     expect(block).toHaveTextContent("pat@example.com");
   });
+
+  it("renders roles when present", () => {
+    render(
+      <UserSummary
+        user={{
+          id: "1",
+          username: "pat",
+          email: "pat@example.com",
+          roles: ["admin"],
+        }}
+      />,
+    );
+    expect(screen.getByTestId("user-summary")).toHaveTextContent("admin");
+  });
 });

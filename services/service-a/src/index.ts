@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import { createApp } from "./app";
 import { AuditLog } from "./auditLog";
-import { buildCreateUserFromEnv } from "./grpcUser";
+import { buildGrpcBackendFromEnv } from "./grpcBackend";
 
 const mongoUri =
   process.env.MONGO_URI || "mongodb://localhost:27017/service_a";
@@ -10,7 +10,7 @@ const grpcHost = process.env.GRPC_HOST || "localhost";
 const grpcPort = process.env.GRPC_PORT || "50051";
 const grpcAddress = `${grpcHost}:${grpcPort}`;
 
-const createUser = buildCreateUserFromEnv();
+const grpc = buildGrpcBackendFromEnv();
 
 const corsRaw = process.env.CORS_ORIGIN;
 const corsOptions =
@@ -20,7 +20,7 @@ const corsOptions =
 
 const app = createApp(
   {
-    createUser,
+    grpc,
     saveAuditLog: async (entry) => {
       await AuditLog.create(entry);
     },

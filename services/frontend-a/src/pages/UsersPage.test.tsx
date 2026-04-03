@@ -1,41 +1,91 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import { AuthProvider } from "../auth/AuthContext";
+import {
+  authTestCleanup,
+  isUsersListGet,
+  primeSession,
+  stubFetchWithMe,
+} from "../test/authTestUtils";
 import { UsersPage } from "./UsersPage";
+
+const adminUser = {
+  id: "1",
+  username: "admin",
+  email: "admin@example.com",
+  roles: ["admin"],
+};
 
 describe("UsersPage", () => {
   afterEach(() => {
-    vi.unstubAllGlobals();
-    vi.restoreAllMocks();
+    authTestCleanup();
   });
 
-  it("submits through gateway", async () => {
+  it("submits create through gateway for admin", async () => {
     const user = userEvent.setup();
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            id: "nid",
-            username: "sam",
-            email: "sam@example.com",
-          }),
-      }),
-    );
+    primeSession();
+    stubFetchWithMe(adminUser, (url, init) => {
+      if (isUsersListGet(url, init)) {
+        return {
+          ok: true,
+          json: () => Promise.resolve([]),
+        } as Response;
+      }
+      if (url.includes("/users") && init?.method === "POST") {
+        return {
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              id: "nid",
+              username: "sam",
+              email: "sam@example.com",
+            }),
+        } as Response;
+      }
+      return undefined;
+    });
     render(
       <MemoryRouter>
-        <Routes>
-          <Route path="/" element={<UsersPage />} />
-        </Routes>
+        <AuthProvider>
+          <Routes>
+            <Route path="/" element={<UsersPage />} />
+          </Routes>
+        </AuthProvider>
       </MemoryRouter>,
     );
+    await waitFor(() => {
+      expect(screen.getByTestId("user-management-panel")).toBeInTheDocument();
+    });
     await user.type(screen.getByLabelText(/username/i), "sam");
     await user.type(screen.getByLabelText(/email/i), "sam@example.com");
     await user.click(screen.getByRole("button", { name: /create user/i }));
     await waitFor(() => {
       expect(screen.getByText("nid")).toBeInTheDocument();
     });
+  });
+
+  it("hides management panel for non-admin", async () => {
+    primeSession();
+    stubFetchWithMe({
+      id: "2",
+      username: "bob",
+      email: "bob@example.com",
+      roles: ["user"],
+    });
+    render(
+      <MemoryRouter>
+        <AuthProvider>
+          <Routes>
+            <Route path="/" element={<UsersPage />} />
+          </Routes>
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId("users-admin-only")).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("user-management-panel")).toBeNull();
   });
 });

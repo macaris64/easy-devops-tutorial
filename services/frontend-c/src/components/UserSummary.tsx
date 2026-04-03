@@ -29,6 +29,12 @@ export function UserSummary({
       <dd>{user.username}</dd>
       <dt>Email</dt>
       <dd>{user.email}</dd>
+      {user.roles && user.roles.length > 0 ? (
+        <>
+          <dt>Roles</dt>
+          <dd>{user.roles.join(", ")}</dd>
+        </>
+      ) : null}
     </dl>
   );
 }

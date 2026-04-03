@@ -11,6 +11,7 @@ RUN npm run build
 FROM node:20-bookworm-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+ENV USER_PROTO_ROOT=/app/protos
 COPY services/service-a/package.json services/service-a/package-lock.json ./
 RUN npm ci --omit=dev
 COPY --from=builder /app/dist ./dist

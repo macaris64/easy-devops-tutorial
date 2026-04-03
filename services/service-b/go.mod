@@ -3,8 +3,10 @@ module easy-devops-tutorial/service-b
 go 1.22
 
 require (
+	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/google/uuid v1.6.0
 	github.com/segmentio/kafka-go v0.4.47
+	golang.org/x/crypto v0.21.0
 	google.golang.org/grpc v1.64.0
 	google.golang.org/protobuf v1.34.1
 	gorm.io/driver/postgres v1.5.7
@@ -21,7 +23,6 @@ require (
 	github.com/klauspost/compress v1.15.9 // indirect
 	github.com/mattn/go-sqlite3 v1.14.22 // indirect
 	github.com/pierrec/lz4/v4 v4.1.15 // indirect
-	golang.org/x/crypto v0.21.0 // indirect
 	golang.org/x/net v0.22.0 // indirect
 	golang.org/x/sys v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect

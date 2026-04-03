@@ -3,33 +3,78 @@ package grpcserver
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"testing"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
+	"easy-devops-tutorial/service-b/internal/auth"
+	userv1 "easy-devops-tutorial/service-b/internal/genpb/user/v1"
+	"easy-devops-tutorial/service-b/internal/grpcauth"
 	"easy-devops-tutorial/service-b/internal/model"
-	pb "easy-devops-tutorial/service-b/pb"
+	"easy-devops-tutorial/service-b/internal/seed"
 )
 
 const bufSize = 1024 * 1024
 
-func testDB(t *testing.T) *gorm.DB {
+func testDBFull(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", t.Name())
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.AutoMigrate(&model.User{}); err != nil {
+	if err := db.AutoMigrate(&model.User{}, &model.Role{}, &model.RefreshToken{}, &model.PasswordResetToken{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := seed.EnsureRoles(db); err != nil {
 		t.Fatal(err)
 	}
 	return db
+}
+
+func adminUser(t *testing.T, db *gorm.DB) (id string) {
+	t.Helper()
+	h, err := auth.HashPassword("adminpass123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rAdmin, rUser model.Role
+	if err := db.Where("name = ?", model.RoleAdmin).First(&rAdmin).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Where("name = ?", model.RoleUser).First(&rUser).Error; err != nil {
+		t.Fatal(err)
+	}
+	u := model.User{
+		ID:           "admin-test-id",
+		Username:     "admin",
+		Email:        "admin@test",
+		PasswordHash: h,
+		Roles:        []model.Role{rUser, rAdmin},
+	}
+	if err := db.Create(&u).Error; err != nil {
+		t.Fatal(err)
+	}
+	return u.ID
+}
+
+func ctxBearer(t *testing.T, signer *auth.JWTSigner, userID string, roles []string) context.Context {
+	t.Helper()
+	tok, _, err := signer.IssueAccessToken(userID, roles, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return metadata.NewOutgoingContext(context.Background(), metadata.Pairs("authorization", "Bearer "+tok))
 }
 
 type mockPublisher struct {
@@ -42,9 +87,8 @@ func (m *mockPublisher) PublishUserCreated(ctx context.Context, userID, username
 	return m.err
 }
 
-func dialBuf(t *testing.T, lis *bufconn.Listener) pb.UserServiceClient {
+func dialUserClient(t *testing.T, lis *bufconn.Listener) userv1.UserServiceClient {
 	t.Helper()
-	//nolint:staticcheck // SA1019: DialContext remains supported for grpc-go 1.x test dialers.
 	conn, err := grpc.DialContext(context.Background(), "bufnet",
 		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
 			return lis.Dial()
@@ -55,57 +99,59 @@ func dialBuf(t *testing.T, lis *bufconn.Listener) pb.UserServiceClient {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = conn.Close() })
-	return pb.NewUserServiceClient(conn)
+	return userv1.NewUserServiceClient(conn)
+}
+
+func startUserServer(t *testing.T, db *gorm.DB, pub UserEventPublisher) (*bufconn.Listener, *grpc.Server) {
+	t.Helper()
+	signer := auth.NewJWTSigner("test-secret", "", "")
+	lis := bufconn.Listen(bufSize)
+	s := grpc.NewServer(grpc.ChainUnaryInterceptor(AuthUnaryInterceptor(signer, PublicGRPCMethods())))
+	userv1.RegisterUserServiceServer(s, NewUserServer(db, pub))
+	go func() { _ = s.Serve(lis) }()
+	t.Cleanup(func() { s.Stop() })
+	return lis, s
 }
 
 func TestGetUser_notFound(t *testing.T) {
-	lis := bufconn.Listen(bufSize)
-	db := testDB(t)
-	s := grpc.NewServer()
-	pb.RegisterUserServiceServer(s, NewUserServer(db, nil))
-	go func() { _ = s.Serve(lis) }()
-	t.Cleanup(func() { s.Stop() })
+	db := testDBFull(t)
+	uid := adminUser(t, db)
+	lis, _ := startUserServer(t, db, nil)
+	client := dialUserClient(t, lis)
+	ctx := ctxBearer(t, auth.NewJWTSigner("test-secret", "", ""), uid, []string{model.RoleAdmin})
 
-	client := dialBuf(t, lis)
-	_, err := client.GetUser(context.Background(), &pb.GetUserRequest{Id: "missing"})
+	_, err := client.GetUser(ctx, &userv1.GetUserRequest{Id: "missing"})
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	st, ok := status.FromError(err)
-	if !ok || st.Code() != codes.NotFound {
+	if status.Code(err) != codes.NotFound {
 		t.Fatalf("got %v", err)
 	}
 }
 
 func TestGetUser_invalid(t *testing.T) {
-	lis := bufconn.Listen(bufSize)
-	db := testDB(t)
-	s := grpc.NewServer()
-	pb.RegisterUserServiceServer(s, NewUserServer(db, nil))
-	go func() { _ = s.Serve(lis) }()
-	t.Cleanup(func() { s.Stop() })
+	db := testDBFull(t)
+	uid := adminUser(t, db)
+	lis, _ := startUserServer(t, db, nil)
+	client := dialUserClient(t, lis)
+	ctx := ctxBearer(t, auth.NewJWTSigner("test-secret", "", ""), uid, []string{model.RoleAdmin})
 
-	client := dialBuf(t, lis)
-	_, err := client.GetUser(context.Background(), &pb.GetUserRequest{Id: ""})
-	if err == nil {
-		t.Fatal("expected error")
-	}
+	_, err := client.GetUser(ctx, &userv1.GetUserRequest{Id: ""})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("code = %v", status.Code(err))
 	}
 }
 
 func TestCreateUser_and_GetUser(t *testing.T) {
-	lis := bufconn.Listen(bufSize)
-	db := testDB(t)
+	db := testDBFull(t)
+	adminID := adminUser(t, db)
 	pub := &mockPublisher{}
-	s := grpc.NewServer()
-	pb.RegisterUserServiceServer(s, NewUserServer(db, pub))
-	go func() { _ = s.Serve(lis) }()
-	t.Cleanup(func() { s.Stop() })
+	lis, _ := startUserServer(t, db, pub)
+	client := dialUserClient(t, lis)
+	signer := auth.NewJWTSigner("test-secret", "", "")
+	ctx := ctxBearer(t, signer, adminID, []string{model.RoleAdmin})
 
-	client := dialBuf(t, lis)
-	created, err := client.CreateUser(context.Background(), &pb.CreateUserRequest{
+	created, err := client.CreateUser(ctx, &userv1.CreateUserRequest{
 		Username: "bob", Email: "bob@example.com",
 	})
 	if err != nil {
@@ -118,7 +164,7 @@ func TestCreateUser_and_GetUser(t *testing.T) {
 		t.Fatalf("publisher calls = %d", pub.calls)
 	}
 
-	got, err := client.GetUser(context.Background(), &pb.GetUserRequest{Id: created.Id})
+	got, err := client.GetUser(ctx, &userv1.GetUserRequest{Id: created.Id})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,41 +174,40 @@ func TestCreateUser_and_GetUser(t *testing.T) {
 }
 
 func TestCreateUser_invalid(t *testing.T) {
-	lis := bufconn.Listen(bufSize)
-	db := testDB(t)
-	s := grpc.NewServer()
-	pb.RegisterUserServiceServer(s, NewUserServer(db, nil))
-	go func() { _ = s.Serve(lis) }()
-	t.Cleanup(func() { s.Stop() })
+	db := testDBFull(t)
+	adminID := adminUser(t, db)
+	lis, _ := startUserServer(t, db, nil)
+	client := dialUserClient(t, lis)
+	ctx := ctxBearer(t, auth.NewJWTSigner("test-secret", "", ""), adminID, []string{model.RoleAdmin})
 
-	client := dialBuf(t, lis)
-	_, err := client.CreateUser(context.Background(), &pb.CreateUserRequest{Username: "", Email: "x"})
+	_, err := client.CreateUser(ctx, &userv1.CreateUserRequest{Username: "", Email: "x"})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("got %v", err)
 	}
 }
 
 func TestGetUser_databaseError(t *testing.T) {
-	db := testDB(t)
+	db := testDBFull(t)
 	if err := db.Migrator().DropTable(&model.User{}); err != nil {
 		t.Fatal(err)
 	}
 	s := NewUserServer(db, nil)
-	_, err := s.GetUser(context.Background(), &pb.GetUserRequest{Id: "any-id"})
+	ctx := grpcauth.WithClaims(context.Background(), &grpcauth.Claims{UserID: "x", Roles: []string{model.RoleAdmin}})
+	_, err := s.GetUser(ctx, &userv1.GetUserRequest{Id: "any-id"})
 	if status.Code(err) != codes.Internal {
 		t.Fatalf("expected Internal, got %v", err)
 	}
 }
 
 func TestCreateUser_duplicate(t *testing.T) {
-	db := testDB(t)
+	db := testDBFull(t)
 	s := NewUserServer(db, nil)
-	ctx := context.Background()
-	_, err := s.CreateUser(ctx, &pb.CreateUserRequest{Username: "dup", Email: "dup@x.com"})
+	ctx := grpcauth.WithClaims(context.Background(), &grpcauth.Claims{UserID: "a", Roles: []string{model.RoleAdmin}})
+	_, err := s.CreateUser(ctx, &userv1.CreateUserRequest{Username: "dup", Email: "dup@x.com"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = s.CreateUser(ctx, &pb.CreateUserRequest{Username: "dup", Email: "dup@x.com"})
+	_, err = s.CreateUser(ctx, &userv1.CreateUserRequest{Username: "dup", Email: "dup@x.com"})
 	if status.Code(err) != codes.Internal {
 		t.Fatalf("expected Internal, got %v", err)
 	}
@@ -171,16 +216,14 @@ func TestCreateUser_duplicate(t *testing.T) {
 func TestCreateUser_kafkaNonStrict_ignoresPublishError(t *testing.T) {
 	t.Setenv("KAFKA_STRICT", "")
 
-	lis := bufconn.Listen(bufSize)
-	db := testDB(t)
+	db := testDBFull(t)
+	adminID := adminUser(t, db)
 	pub := &mockPublisher{err: errors.New("kafka unavailable")}
-	s := grpc.NewServer()
-	pb.RegisterUserServiceServer(s, NewUserServer(db, pub))
-	go func() { _ = s.Serve(lis) }()
-	t.Cleanup(func() { s.Stop() })
+	lis, _ := startUserServer(t, db, pub)
+	client := dialUserClient(t, lis)
+	ctx := ctxBearer(t, auth.NewJWTSigner("test-secret", "", ""), adminID, []string{model.RoleAdmin})
 
-	client := dialBuf(t, lis)
-	created, err := client.CreateUser(context.Background(), &pb.CreateUserRequest{
+	created, err := client.CreateUser(ctx, &userv1.CreateUserRequest{
 		Username: "z", Email: "z@z.com",
 	})
 	if err != nil {
@@ -194,16 +237,14 @@ func TestCreateUser_kafkaNonStrict_ignoresPublishError(t *testing.T) {
 func TestCreateUser_kafkaStrict(t *testing.T) {
 	t.Setenv("KAFKA_STRICT", "1")
 
-	lis := bufconn.Listen(bufSize)
-	db := testDB(t)
+	db := testDBFull(t)
+	adminID := adminUser(t, db)
 	pub := &mockPublisher{err: errors.New("kafka down")}
-	s := grpc.NewServer()
-	pb.RegisterUserServiceServer(s, NewUserServer(db, pub))
-	go func() { _ = s.Serve(lis) }()
-	t.Cleanup(func() { s.Stop() })
+	lis, _ := startUserServer(t, db, pub)
+	client := dialUserClient(t, lis)
+	ctx := ctxBearer(t, auth.NewJWTSigner("test-secret", "", ""), adminID, []string{model.RoleAdmin})
 
-	client := dialBuf(t, lis)
-	_, err := client.CreateUser(context.Background(), &pb.CreateUserRequest{
+	_, err := client.CreateUser(ctx, &userv1.CreateUserRequest{
 		Username: "k", Email: "k@k.com",
 	})
 	if err == nil {

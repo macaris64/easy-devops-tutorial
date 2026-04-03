@@ -2,12 +2,13 @@ syntax = "proto3";
 
 package user.v1;
 
-option go_package = "easy-devops-tutorial/service-b/pb;pb";
+option go_package = "easy-devops-tutorial/service-b/internal/genpb/user/v1;userv1";
 
 message User {
   string id = 1;
   string username = 2;
   string email = 3;
+  repeated string roles = 4;
 }
 
 message GetUserRequest {
@@ -17,9 +18,30 @@ message GetUserRequest {
 message CreateUserRequest {
   string username = 1;
   string email = 2;
+  optional string password = 3;
+}
+
+message ListUsersRequest {}
+
+message ListUsersResponse {
+  repeated User users = 1;
+}
+
+message UpdateUserRequest {
+  string id = 1;
+  optional string username = 2;
+  optional string email = 3;
+  optional string password = 4;
+}
+
+message DeleteUserRequest {
+  string id = 1;
 }
 
 service UserService {
   rpc GetUser(GetUserRequest) returns (User);
   rpc CreateUser(CreateUserRequest) returns (User);
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
+  rpc UpdateUser(UpdateUserRequest) returns (User);
+  rpc DeleteUser(DeleteUserRequest) returns (User);
 }

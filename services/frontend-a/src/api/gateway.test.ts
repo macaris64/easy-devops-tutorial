@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createUser, fetchAuditLogs } from "./gateway";
+import { authTestCleanup, primeSession } from "../test/authTestUtils";
+import { createUser, fetchAuditLogs, fetchUser } from "./gateway";
 
 describe("gateway", () => {
   afterEach(() => {
-    vi.unstubAllGlobals();
-    vi.restoreAllMocks();
+    authTestCleanup();
   });
 
   it("createUser returns JSON body on success", async () => {
@@ -86,6 +86,39 @@ describe("gateway", () => {
     await expect(fetchAuditLogs()).rejects.toThrow("invalid audit log response");
   });
 
+  it("fetchUser GETs encoded id", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            id: "u1",
+            username: "a",
+            email: "a@b.c",
+          }),
+      }),
+    );
+    const u = await fetchUser("id/with spaces");
+    expect(u.id).toBe("u1");
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/users/id%2Fwith%20spaces",
+      expect.objectContaining({ headers: expect.any(Headers) }),
+    );
+  });
+
+  it("fetchUser throws on HTTP error", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        statusText: "Not Found",
+        json: () => Promise.resolve({ error: "user not found" }),
+      }),
+    );
+    await expect(fetchUser("x")).rejects.toThrow("user not found");
+  });
+
   it("fetchAuditLogs throws on HTTP error", async () => {
     vi.stubGlobal(
       "fetch",
@@ -96,5 +129,23 @@ describe("gateway", () => {
       }),
     );
     await expect(fetchAuditLogs()).rejects.toThrow("fail");
+  });
+
+  it("createUser sends Authorization when access token is set", async () => {
+    primeSession("my-token");
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          id: "1",
+          username: "a",
+          email: "a@b.c",
+        }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await createUser("a", "a@b.c");
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    const headers = init.headers as Headers;
+    expect(headers.get("Authorization")).toBe("Bearer my-token");
   });
 });

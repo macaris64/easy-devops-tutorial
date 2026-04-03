@@ -1,6 +1,8 @@
 # easy-devops-tutorial
 
-Polyglot microservices monorepo: **Service-A** (Node.js / Express + MongoDB), **Service-B** (Go / gRPC + PostgreSQL + Kafka), **Service-C** (Python / aiokafka). The API contract lives in `services/common/protos/user/v1/user.proto`.
+Polyglot microservices monorepo: **Service-A** (Node.js / Express + MongoDB), **Service-B** (Go / gRPC + PostgreSQL + Kafka), **Service-C** (Python / aiokafka). Shared contracts live in `services/common/protos` (`user`, `auth`, `role`).
+
+**API documentation:** [docs/API.md](docs/API.md) (REST gateway, JWT/RBAC, gRPC services, Kafka).
 
 ## Local URLs and ports
 
@@ -14,7 +16,7 @@ After `docker compose up`, services publish to **localhost** unless you change t
 |-------------|---------|--------|
 | **Service-A** (REST API) | [http://localhost:3000](http://localhost:3000) | HTTP; `SERVICE_A_HTTP_PORT` |
 | **Service-B** (gRPC) | `localhost:50051` | gRPC only; `SERVICE_B_GRPC_PORT` |
-| **Service-C** (Kafka consumer) | — | No host port; runs on `app-network` only |
+| **Service-C** (Kafka consumer) | — | No host port; runs on `app-network` only; **no HTTP / auth APIs** ([services/service-c/README.md](services/service-c/README.md)) |
 | **frontend-a** (admin SPA) | [http://localhost:4173](http://localhost:4173) | Proxies `/api` to Service-A in Docker; `FRONTEND_A_PORT` |
 | **frontend-b** (log panel Storybook) | [http://localhost:6006](http://localhost:6006) | `FRONTEND_B_PORT` |
 | **frontend-c** (user panel Storybook) | [http://localhost:6007](http://localhost:6007) | `FRONTEND_C_PORT` |
@@ -50,14 +52,16 @@ After `docker compose up`, services publish to **localhost** unless you change t
 
    `docker-compose.yml` includes `docker-compose.infra.yml`. All containers attach to the **`app-network`** bridge network.
 
-3. Smoke-test the HTTP API:
+3. Smoke-test the HTTP API and auth:
 
    ```bash
    curl -s http://localhost:3000/health
-   curl -s -X POST http://localhost:3000/users \
+   curl -s -X POST http://localhost:3000/auth/login \
      -H 'Content-Type: application/json' \
-     -d '{"username":"alice","email":"alice@example.com"}'
+     -d '{"username":"admin","password":"admin123"}'
    ```
+
+   Compose seeds a bootstrap admin when `BOOTSTRAP_ADMIN_USERNAME` / `BOOTSTRAP_ADMIN_PASSWORD` are set (defaults in `docker-compose.yml` match `.env.example`). Open [http://localhost:4173](http://localhost:4173), sign in at `/login`, then use **Users** (admin only) or **Look up user** by id.
 
 4. **Kafka UI**: [http://localhost:8080](http://localhost:8080) — inspect the `user.created` topic.
 
@@ -93,7 +97,7 @@ Each service has its own workflow under `.github/workflows/`:
 | `service-c.yml`| `services/service-c/**`                            |
 | `frontends.yml`| `services/frontend-a/**`, `services/frontend-b/**`, `services/frontend-c/**` |
 
-Jobs run **lint**, **build** (where applicable), **stylelint** (Service-A CSS only), **tests**, and enforce **≥90% coverage** for backend services and **≥80%** for the React frontends (`frontends.yml`).
+Jobs run **lint**, **build** (where applicable), **stylelint** (Service-A CSS only), **tests**, and coverage thresholds from each package (Service-A Jest: high line/statement coverage with a pragmatic branch floor; Service-B: aggregate script excludes generated protos/models; frontends **≥80%** in `frontends.yml`).
 
 ### Local quality commands
 
@@ -112,7 +116,7 @@ npm run test:coverage # Jest, thresholds in jest.config.cjs
 ```bash
 golangci-lint run ./...
 go build -o /tmp/service-b .
-bash scripts/check-coverage.sh   # go test ./internal/... total ≥90%
+bash scripts/check-coverage.sh   # go test ./internal/... (aggregate min 60%, excludes genpb+model)
 ```
 
 **Service-C** (`services/service-c`):
@@ -147,6 +151,10 @@ Configure hosts and secrets via `.env` / `.env.example` (databases, Kafka, gRPC)
 | `KAFKA_BROKERS` | e.g. `kafka:9092` on the Docker network |
 | `USER_CREATED_TOPIC` | Default `user.created` |
 | `GRPC_HOST` / `GRPC_PORT` | Service-A → Service-B gRPC |
+| `USER_PROTO_ROOT` | Service-A: directory with `user/`, `auth/`, `role/` proto trees (Docker: `/app/protos`) |
+| `JWT_SECRET` | Service-B: HMAC key for access JWTs |
+| `BOOTSTRAP_ADMIN_USERNAME` / `BOOTSTRAP_ADMIN_PASSWORD` | Service-B: optional seed admin on migrate |
+| `PASSWORD_RESET_DEV_RETURN_TOKEN` | Service-B: `1` to return reset token in JSON (dev only) |
 
 ## Bitnami images
 
@@ -154,7 +162,7 @@ Kafka and Zookeeper use **`public.ecr.aws/bitnami/...`** because some environmen
 
 ## Protobuf
 
-Service-B’s Docker build runs `protoc` against `services/common/protos/`. Checked-in files under `services/service-b/pb/` help local IDE builds. Change contracts in `services/common/protos/` first.
+Service-B’s Docker build runs **`buf generate`** from `services/common` into `internal/genpb`. Change contracts in `services/common/protos/` first, then regenerate stubs.
 
 [Buf](https://buf.build) enforces lint, formatting, and builds in CI (`proto.yml`). Locally, install the Buf CLI and from `services/common` run `bash scripts/validate-protos.sh` (same checks as CI except breaking detection).
 
@@ -163,7 +171,7 @@ Service-B’s Docker build runs `protoc` against `services/common/protos/`. Chec
 - `services/service-a` — REST gateway
 - `services/service-b` — gRPC + PostgreSQL + Kafka producer
 - `services/service-c` — Kafka consumer worker
-- `services/frontend-a` — Admin SPA (users + audit log viewer; proxies `/api` to Service-A in Docker)
+- `services/frontend-a` — Admin SPA (login, JWT session, admin-gated user management, user lookup, audit logs, Kafka UI link; proxies `/api` to Service-A in Docker)
 - `services/frontend-b` — Log panel component library + Storybook image
 - `services/frontend-c` — User panel component library + Storybook image
 - `services/common/protos` — shared `.proto` files
