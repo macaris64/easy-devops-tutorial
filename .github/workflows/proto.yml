@@ -1,0 +1,35 @@
+name: Proto
+
+on:
+  push:
+    paths:
+      - ".github/workflows/proto.yml"
+      - "services/common/**"
+  pull_request:
+    paths:
+      - ".github/workflows/proto.yml"
+      - "services/common/**"
+
+jobs:
+  buf:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/common
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          version: 1.47.2
+
+      - name: Lint, build, format
+        run: bash scripts/validate-protos.sh
+
+      - name: Breaking change detection
+        if: github.event_name == 'pull_request'
+        run: >
+          buf breaking
+          --against "${GITHUB_WORKSPACE}/.git#branch=${{ github.event.pull_request.base.ref }},subdir=services/common"

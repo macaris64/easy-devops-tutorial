@@ -17,7 +17,7 @@ RUN mkdir -p pb && protoc \
   -I/protos \
   --go_out=pb --go_opt=paths=source_relative \
   --go-grpc_out=pb --go-grpc_opt=paths=source_relative \
-  /protos/user.proto
+  /protos/user/v1/user.proto
 
 ENV CGO_ENABLED=0
 RUN go mod download \

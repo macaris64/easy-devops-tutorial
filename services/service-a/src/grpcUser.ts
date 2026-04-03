@@ -36,7 +36,7 @@ export function createCreateUserFn(
 export function defaultProtoPath(): string {
   return (
     process.env.USER_PROTO_PATH ||
-    path.join(__dirname, "..", "protos", "user.proto")
+    path.join(__dirname, "..", "protos", "user", "v1", "user.proto")
   );
 }
 

@@ -9,4 +9,4 @@
 | `github.com/segmentio/kafka-go` | `user.created` event producer |
 | `github.com/google/uuid` | User primary keys |
 
-Proto source: `services/common/protos/user.proto` (Docker builds regenerate `pb/`).
+Proto source: `services/common/protos/user/v1/user.proto` (Docker builds regenerate `pb/`).

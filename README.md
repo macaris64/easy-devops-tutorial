@@ -1,6 +1,6 @@
 # easy-devops-tutorial
 
-Polyglot microservices monorepo: **Service-A** (Node.js / Express + MongoDB), **Service-B** (Go / gRPC + PostgreSQL + Kafka), **Service-C** (Python / aiokafka). The API contract lives in `services/common/protos/user.proto`.
+Polyglot microservices monorepo: **Service-A** (Node.js / Express + MongoDB), **Service-B** (Go / gRPC + PostgreSQL + Kafka), **Service-C** (Python / aiokafka). The API contract lives in `services/common/protos/user/v1/user.proto`.
 
 ## Requirements
 
@@ -50,6 +50,7 @@ Each service has its own workflow under `.github/workflows/`:
 
 | Workflow       | Path triggers                                      |
 |----------------|----------------------------------------------------|
+| `proto.yml`    | `services/common/**` (Buf lint, build, format, breaking on PRs) |
 | `service-a.yml`| `services/service-a/**`, shared proto changes      |
 | `service-b.yml`| `services/service-b/**`, shared proto changes      |
 | `service-c.yml`| `services/service-c/**`                            |
@@ -105,6 +106,8 @@ Kafka and Zookeeper use **`public.ecr.aws/bitnami/...`** because some environmen
 ## Protobuf
 
 Service-B’s Docker build runs `protoc` against `services/common/protos/`. Checked-in files under `services/service-b/pb/` help local IDE builds. Change contracts in `services/common/protos/` first.
+
+[Buf](https://buf.build) enforces lint, formatting, and builds in CI (`proto.yml`). Locally, install the Buf CLI and from `services/common` run `bash scripts/validate-protos.sh` (same checks as CI except breaking detection).
 
 ## Layout
 
