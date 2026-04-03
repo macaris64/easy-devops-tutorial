@@ -1,0 +1,41 @@
+name: Service B
+
+on:
+  push:
+    paths:
+      - ".github/workflows/service-b.yml"
+      - "services/service-b/**"
+      - "services/common/protos/**"
+  pull_request:
+    paths:
+      - ".github/workflows/service-b.yml"
+      - "services/service-b/**"
+      - "services/common/protos/**"
+
+defaults:
+  run:
+    working-directory: services/service-b
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache-dependency-path: services/service-b/go.sum
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.59.1
+          working-directory: services/service-b
+          args: --timeout=5m
+
+      - name: Go build
+        run: go build -o /tmp/service-b .
+
+      - name: Tests and coverage (internal packages ≥90%)
+        run: bash scripts/check-coverage.sh

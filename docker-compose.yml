@@ -1,0 +1,65 @@
+# Application services; includes docker-compose.infra.yml for databases and Kafka.
+
+include:
+  - docker-compose.infra.yml
+
+services:
+  service-b:
+    build:
+      context: .
+      dockerfile: services/service-b/Dockerfile
+    container_name: service-b
+    environment:
+      POSTGRES_DSN: host=postgres user=${POSTGRES_USER:-postgres} password=${POSTGRES_PASSWORD:-postgres} dbname=${POSTGRES_DB:-users} port=5432 sslmode=disable
+      KAFKA_BROKERS: ${KAFKA_BROKERS:-kafka:9092}
+      USER_CREATED_TOPIC: ${USER_CREATED_TOPIC:-user.created}
+      GRPC_LISTEN_ADDR: ${GRPC_LISTEN_ADDR:-:50051}
+    ports:
+      - "${SERVICE_B_GRPC_PORT:-50051}:50051"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    networks:
+      - app-network
+
+  service-a:
+    build:
+      context: .
+      dockerfile: services/service-a/Dockerfile
+    container_name: service-a
+    environment:
+      PORT: ${SERVICE_A_PORT:-3000}
+      MONGO_URI: ${MONGO_URI:-mongodb://mongodb:27017/service_a}
+      GRPC_HOST: ${GRPC_HOST:-service-b}
+      GRPC_PORT: ${GRPC_PORT:-50051}
+    ports:
+      - "${SERVICE_A_HTTP_PORT:-3000}:3000"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      service-b:
+        condition: service_started
+    networks:
+      - app-network
+
+  service-c:
+    build:
+      context: .
+      dockerfile: services/service-c/Dockerfile
+    container_name: service-c
+    environment:
+      KAFKA_BROKERS: ${KAFKA_BROKERS:-kafka:9092}
+      KAFKA_GROUP_ID: ${KAFKA_GROUP_ID:-service-c-all-topics}
+      KAFKA_TOPIC_PATTERN: ${KAFKA_TOPIC_PATTERN:-.*}
+      KAFKA_AUTO_OFFSET_RESET: ${KAFKA_AUTO_OFFSET_RESET:-earliest}
+    depends_on:
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    networks:
+      - app-network

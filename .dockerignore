@@ -1,0 +1,10 @@
+.git
+**/.git
+**/node_modules
+**/dist
+**/__pycache__
+**/.venv
+**/*.pyc
+**/.env
+**/.env.*
+!.env.example

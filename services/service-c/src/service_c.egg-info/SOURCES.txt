@@ -1,0 +1,14 @@
+pyproject.toml
+src/__init__.py
+src/config.py
+src/consumer.py
+src/main.py
+src/message_format.py
+src/service_c.egg-info/PKG-INFO
+src/service_c.egg-info/SOURCES.txt
+src/service_c.egg-info/dependency_links.txt
+src/service_c.egg-info/requires.txt
+src/service_c.egg-info/top_level.txt
+tests/test_config.py
+tests/test_consumer.py
+tests/test_message_format.py

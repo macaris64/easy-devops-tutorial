@@ -1,0 +1,5 @@
+/* Minimal stylesheet for stylelint coverage (Service-A is API-only). */
+.service-a-placeholder {
+  color: #333;
+  font-family: system-ui, sans-serif;
+}
