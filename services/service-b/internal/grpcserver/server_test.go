@@ -70,7 +70,8 @@ func (m *mockPublisher) PublishUserCreated(ctx context.Context, userID, username
 
 func dialUserClient(t *testing.T, lis *bufconn.Listener) userv1.UserServiceClient {
 	t.Helper()
-	conn, err := grpc.DialContext(context.Background(), "bufnet",
+	conn, err := grpc.NewClient(
+		"passthrough:///bufnet",
 		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
 			return lis.Dial()
 		}),

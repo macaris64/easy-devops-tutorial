@@ -95,11 +95,11 @@ func Run(opts *Options) error {
 	); migrateErr != nil {
 		return fmt.Errorf("migrate: %w", migrateErr)
 	}
-	if err := seed.EnsureRoles(db); err != nil {
-		return fmt.Errorf("seed roles: %w", err)
+	if seedErr := seed.EnsureRoles(db); seedErr != nil {
+		return fmt.Errorf("seed roles: %w", seedErr)
 	}
-	if err := seed.BootstrapAdmin(db); err != nil {
-		return fmt.Errorf("bootstrap admin: %w", err)
+	if seedErr := seed.BootstrapAdmin(db); seedErr != nil {
+		return fmt.Errorf("bootstrap admin: %w", seedErr)
 	}
 
 	var producer *kafkaprod.Producer

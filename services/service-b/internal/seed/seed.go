@@ -43,7 +43,7 @@ func BootstrapAdmin(db *gorm.DB) error {
 	if err == nil {
 		return nil
 	}
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
 	hash, err := auth.HashPassword(p)

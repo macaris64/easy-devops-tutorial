@@ -101,10 +101,11 @@ describe("gateway", () => {
     );
     const u = await fetchUser("id/with spaces");
     expect(u.id).toBe("u1");
-    expect(fetch).toHaveBeenCalledWith(
+    expect(vi.mocked(fetch).mock.calls[0]?.[0]).toBe(
       "/api/users/id%2Fwith%20spaces",
-      expect.objectContaining({ headers: expect.any(Headers) }),
     );
+    const init = vi.mocked(fetch).mock.calls[0]?.[1];
+    expect(init?.headers).toBeInstanceOf(Headers);
   });
 
   it("fetchUser throws on HTTP error", async () => {

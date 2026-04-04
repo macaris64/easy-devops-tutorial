@@ -35,7 +35,12 @@ export function stubFetchWithMe(
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = typeof input === "string" ? input : input.toString();
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url;
       if (extra) {
         const fromExtra = await extra(url, init);
         if (fromExtra !== undefined) {

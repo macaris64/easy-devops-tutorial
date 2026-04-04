@@ -105,6 +105,8 @@ export function AuthProvider({ children }: { children: ReactNode }): ReactElemen
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
+/** Co-located hook for this context; fast-refresh wants hooks separate from providers. */
+// eslint-disable-next-line react-refresh/only-export-components -- useAuth is tied to AuthProvider
 export function useAuth(): AuthState {
   const ctx = useContext(AuthContext);
   if (!ctx) {

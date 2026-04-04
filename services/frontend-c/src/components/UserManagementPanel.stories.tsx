@@ -33,11 +33,12 @@ export const WithDirectory: Story = {
       Promise.resolve([
         { id: "1", username: "alice", email: "alice@example.com", roles: ["user"] },
       ]),
-    updateUser: async (id, patch) => ({
-      id,
-      username: patch.username ?? "alice",
-      email: "alice@example.com",
-    }),
-    deleteUser: async () => undefined,
+    updateUser: (id, patch) =>
+      Promise.resolve({
+        id,
+        username: patch.username ?? "alice",
+        email: "alice@example.com",
+      }),
+    deleteUser: () => Promise.resolve(undefined),
   },
 };
