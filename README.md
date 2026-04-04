@@ -2,7 +2,7 @@
 
 Polyglot microservices monorepo: **Service-A** (Node.js / Express + MongoDB), **Service-B** (Go / gRPC + PostgreSQL + Kafka), **Service-C** (Python / aiokafka). Shared contracts live in `services/common/protos` (`user`, `auth`, `role`).
 
-**API documentation:** [docs/API.md](docs/API.md) (REST gateway, JWT/RBAC, gRPC services, Kafka).
+**API documentation:** [docs/API.md](docs/API.md) (REST gateway, JWT/RBAC, gRPC services, Kafka). **Operations / IaC:** [docs/INFRASTRUCTURE.md](docs/INFRASTRUCTURE.md).
 
 ## Local URLs and ports
 
@@ -35,6 +35,13 @@ After `docker compose up`, services publish to **localhost** unless you change t
 
 - Docker and Docker Compose v2 (`docker compose`) with `include` support (Compose 2.20+ recommended).
 - Optional for local development: Go 1.22+, Node 20+, Python 3.11+.
+- Optional **IaC path**: Terraform, Ansible (with `community.docker`), and Puppet via Docker—see [infrastructure/README.md](infrastructure/README.md). Run `make help` from the repo root for shortcuts.
+
+## Infrastructure as Code (optional)
+
+Terraform provisions the Docker **network** and **named data volumes** used with [`docker-compose.iac.yml`](docker-compose.iac.yml), and writes a **secrets** fragment under `infrastructure/generated/terraform.env.fragment` (from Terraform variables; see [`infrastructure/terraform/README.md`](infrastructure/terraform/README.md)). Puppet (containerized `puppet apply`) renders `infrastructure/generated/kafka-topics.yaml` and `compose.env.fragment`. Ansible runs `docker compose`, applies **Kafka topics** from that catalog (`--if-not-exists`, same defaults as `kafka-init`), and checks `GET /health`.
+
+**Order:** `terraform apply` → merge Terraform env fragment into `.env` → Puppet render → merge Puppet fragment → `ansible-playbook infrastructure/ansible/playbooks/site.yml`. Do **not** run Terraform on the same host if you rely on plain `docker compose up` without the overlay (both create `app-network`). Details: [infrastructure/README.md](infrastructure/README.md).
 
 ## Quick start
 
@@ -50,7 +57,7 @@ After `docker compose up`, services publish to **localhost** unless you change t
    docker compose up --build -d
    ```
 
-   `docker-compose.yml` includes `docker-compose.infra.yml`. All containers attach to the **`app-network`** bridge network.
+   `docker-compose.yml` includes `docker-compose.infra.yml`. All containers attach to the **`app-network`** bridge network. Postgres and MongoDB use **named volumes** (`postgres_data`, `mongodb_data`) so data survives container recreation (`docker compose down` without `-v` keeps volumes).
 
 3. Smoke-test the HTTP API and auth:
 
@@ -69,7 +76,7 @@ After `docker compose up`, services publish to **localhost** unless you change t
 
 4. **Kafka UI**: [http://localhost:8080](http://localhost:8080) — inspect **`user.events`** and **`role.events`** (defaults; override with `KAFKA_USER_EVENTS_TOPIC` / `KAFKA_ROLE_EVENTS_TOPIC`).
 
-5. **Kafka topics**: `kafka-init` in `docker-compose.infra.yml` creates both topics above. Service-B and Service-C start after it completes successfully.
+5. **Kafka topics**: `kafka-init` in `docker-compose.infra.yml` creates both topics above. Service-B and Service-C start after it completes successfully. On the **Ansible IaC** path, the same topics are ensured again from the Puppet-generated catalog (idempotent). See [infrastructure/README.md](infrastructure/README.md).
 
 6. **Service-C** logs (by default it **discovers and subscribes to all** non-internal Kafka topics):
 

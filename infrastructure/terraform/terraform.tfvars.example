@@ -1,0 +1,6 @@
+# Copy to terraform.tfvars (gitignored) and set values. Alternatively use TF_VAR_postgres_password etc.
+#
+# postgres_password          = "use-a-strong-password"
+# jwt_secret                 = "long-random-string"
+# bootstrap_admin_password   = "use-a-strong-password"
+# seed_demo_password         = "use-a-strong-password"

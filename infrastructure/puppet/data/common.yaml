@@ -1,0 +1,14 @@
+---
+# Hiera data for easy_devops class (local tutorial defaults).
+easy_devops::repo_root: "/workspace"
+easy_devops::postgres_volume_name: "easy_devops_postgres_data"
+easy_devops::mongodb_volume_name: "easy_devops_mongodb_data"
+easy_devops::kafka_user_events_topic: "user.events"
+easy_devops::kafka_role_events_topic: "role.events"
+easy_devops::kafka_topics:
+  - name: "user.events"
+    partitions: 1
+    replication_factor: 1
+  - name: "role.events"
+    partitions: 1
+    replication_factor: 1

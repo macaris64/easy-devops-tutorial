@@ -1,0 +1,31 @@
+---
+# Bring up the stack with docker compose.
+# IaC path (default): Terraform + docker-compose.iac.yml overlay.
+# Quickstart: ansible-playbook ... -e iac_compose_overlay=false
+- name: Deploy Compose stack
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tags: [deploy, compose, infra, services, frontends]
+  vars:
+    compose_project_dir: "{{ playbook_dir | dirname | dirname | dirname }}"
+    iac_compose_overlay: true
+  tasks:
+    - name: Compose up (Terraform-managed network and volumes)
+      community.docker.docker_compose_v2:
+        project_src: "{{ compose_project_dir }}"
+        files:
+          - docker-compose.yml
+          - docker-compose.iac.yml
+        build: policy
+        state: present
+      when: iac_compose_overlay | bool
+
+    - name: Compose up (quickstart — no IaC overlay)
+      community.docker.docker_compose_v2:
+        project_src: "{{ compose_project_dir }}"
+        files:
+          - docker-compose.yml
+        build: policy
+        state: present
+      when: not (iac_compose_overlay | bool)

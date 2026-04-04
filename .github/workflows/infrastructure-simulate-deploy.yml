@@ -1,0 +1,140 @@
+# Simulated deploy on the GitHub runner’s Docker (no cloud).
+# Called from PR (development) and main (master) workflows.
+
+on:
+  workflow_call:
+    inputs:
+      environment_name:
+        description: Logical environment label shown in GitHub Deployments (development | master).
+        required: true
+        type: string
+
+concurrency:
+  group: infra-sim-${{ inputs.environment_name }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  terraform-ansible-puppet:
+    name: Simulate (${{ inputs.environment_name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    env:
+      ANSIBLE_COLLECTIONS_PATH: ${{ github.workspace }}/.ansible/collections
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Simulated deployment target
+        run: |
+          echo "DEPLOY_ENV=${{ inputs.environment_name }}"
+          echo "Running full stack on the runner Docker daemon (simulation only; resources destroyed at end)."
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Ansible Core
+        run: pip install "ansible-core>=2.14,<2.18"
+
+      - name: Install Ansible collections
+        run: ansible-galaxy collection install -r infrastructure/ansible/requirements.yml --collections-path "$ANSIBLE_COLLECTIONS_PATH"
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.0"
+          terraform_wrapper: false
+
+      - name: Terraform fmt
+        working-directory: infrastructure/terraform
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init
+        working-directory: infrastructure/terraform
+        run: terraform init
+
+      - name: Terraform validate
+        working-directory: infrastructure/terraform
+        run: terraform validate
+
+      - name: Puppet parser validate
+        run: make infra-puppet-validate
+
+      - name: Ansible syntax check
+        working-directory: infrastructure/ansible
+        run: |
+          ansible-playbook -i inventory/hosts.yml playbooks/deploy.yml --syntax-check
+          ansible-playbook -i inventory/hosts.yml playbooks/kafka_topics.yml --syntax-check
+          ansible-playbook -i inventory/hosts.yml playbooks/verify.yml --syntax-check
+          ansible-playbook -i inventory/hosts.yml playbooks/site.yml --syntax-check
+
+      - name: Terraform apply
+        working-directory: infrastructure/terraform
+        run: terraform apply -auto-approve
+
+      - name: Puppet apply (generate Kafka catalog)
+        run: make infra-puppet-apply
+
+      - name: Prepare .env for Compose
+        run: |
+          cp .env.example .env
+          if [ -f infrastructure/generated/terraform.env.fragment ]; then
+            cat infrastructure/generated/terraform.env.fragment >> .env
+          fi
+          cat infrastructure/generated/compose.env.fragment >> .env
+
+      # Shared runner IPs hit Docker Hub anonymous limits when compose pulls many
+      # images in parallel (Kafka UI + Node/Go/Nginx bases). Log in if secrets exist,
+      # then pre-pull sequentially so `docker compose up` mostly uses the cache.
+      - name: Log in to Docker Hub (optional)
+        if: ${{ secrets.DOCKERHUB_USERNAME && secrets.DOCKERHUB_TOKEN }}
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Pre-pull container images (sequential + retry)
+        run: |
+          set -euo pipefail
+          pull_retry() {
+            local name="$1"
+            local i
+            for i in 1 2 3 4 5; do
+              if docker pull "$name"; then
+                return 0
+              fi
+              echo "docker pull attempt $i failed for $name; backing off..."
+              sleep $((i * 20))
+            done
+            echo "docker pull failed after retries: $name"
+            return 1
+          }
+          # Infra (defaults match docker-compose.infra.yml / .env.example)
+          pull_retry public.ecr.aws/docker/library/mongo:7
+          pull_retry public.ecr.aws/docker/library/postgres:16-alpine
+          pull_retry public.ecr.aws/bitnami/zookeeper:3.9
+          pull_retry public.ecr.aws/bitnami/kafka:3.6
+          pull_retry provectuslabs/kafka-ui:v0.7.2
+          # Application Dockerfile bases (same tags as service Dockerfiles)
+          pull_retry golang:1.22-bookworm
+          pull_retry node:20-bookworm
+          pull_retry node:20-bookworm-slim
+          pull_retry python:3.11-slim
+          pull_retry nginx:1.27-alpine
+          pull_retry gcr.io/distroless/static-debian12:nonroot
+
+      - name: Ansible site (Compose, Kafka topics, health)
+        working-directory: infrastructure/ansible
+        run: ansible-playbook -i inventory/hosts.yml playbooks/site.yml
+
+      - name: Tear down Compose
+        if: always()
+        run: docker compose -f docker-compose.yml -f docker-compose.iac.yml down --remove-orphans || true
+
+      - name: Terraform destroy
+        if: always()
+        working-directory: infrastructure/terraform
+        run: terraform destroy -auto-approve || true

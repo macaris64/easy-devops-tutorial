@@ -1,0 +1,34 @@
+# On pull request: simulate a “development” deploy on the runner (Docker only).
+
+name: Infrastructure (PR — development)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - ".github/workflows/infrastructure-pull-request.yml"
+      - ".github/workflows/infrastructure-simulate-deploy.yml"
+      - "infrastructure/**"
+      - "docker-compose*.yml"
+      - "Makefile"
+      - ".env.example"
+
+jobs:
+  simulate-development:
+    uses: ./.github/workflows/infrastructure-simulate-deploy.yml
+    secrets: inherit
+    with:
+      environment_name: development
+
+  # GitHub Environments are unavailable for fork PR workflows; skip registration there.
+  register-simulated-deployment:
+    name: Register simulated-development deployment
+    needs: simulate-development
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      deployments: write
+    environment: simulated-development
+    steps:
+      - name: Record simulated deploy
+        run: echo "IaC simulation (Terraform, Puppet, Ansible) completed for this PR."

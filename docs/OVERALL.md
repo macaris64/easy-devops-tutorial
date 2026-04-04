@@ -11,9 +11,9 @@ This document defines the architectural standards, communication protocols, and 
 │   ├── /service-c           # Python (Event Consumer / Worker)
 │   └── /common              # Shared Protocol Buffers (.proto) & Configs
 ├── /infrastructure
-│   ├── /terraform           # Local Infrastructure Provisioning (Libvirt/VirtualBox)
-│   ├── /ansible             # Configuration & Deployment Playbooks
-│   └── /puppet              # System State & Policy Management
+│   ├── /terraform           # Local Docker network + volumes (Terraform Docker provider)
+│   ├── /ansible             # Compose deploy, Kafka topics, smoke checks
+│   └── /puppet              # Hiera + generated config (containerized apply)
 ├── docker-compose.yml       # Application Services Orchestration
 └── docker-compose.infra.yml # Shared Backing Services (Kafka, DBs, etc.)
 

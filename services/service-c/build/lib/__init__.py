@@ -1,1 +1,0 @@
-"""Service-C source package."""

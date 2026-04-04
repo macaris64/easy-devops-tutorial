@@ -1,6 +1,6 @@
 # Architecture
 
-This document describes how the **easy-devops-tutorial** system is structured: runtime components, how they talk to each other, where state lives, and how contracts are shared. For standards and folder layout, see [OVERALL.md](OVERALL.md). For HTTP paths, gRPC services, and Kafka message shapes, see [API.md](API.md). For ports, quick start, and CI, see the [root README](../README.md).
+This document describes how the **easy-devops-tutorial** system is structured: runtime components, how they talk to each other, where state lives, and how contracts are shared. For standards and folder layout, see [OVERALL.md](OVERALL.md). For HTTP paths, gRPC services, and Kafka message shapes, see [API.md](API.md). For ports, quick start, and CI, see the [root README](../README.md). For IaC, Makefile, E2E checks, and quality commands, see [INFRASTRUCTURE.md](INFRASTRUCTURE.md).
 
 ---
 
@@ -110,6 +110,13 @@ Changes flow **proto first**, then regenerate Go code; service-a’s build copie
 - **Service discovery** uses Docker DNS (`service-b`, `kafka`, `mongodb`, `postgres`, etc.).
 - **kafka-init** ensures topics exist before producers/consumers rely on them.
 - **Kafka** exposes an **internal** listener (`kafka:9092`) for containers and an **external** listener on the host (default `localhost:9094`) for host-side tools; see [README.md](../README.md).
+- **PostgreSQL and MongoDB** use Compose **named volumes** (`postgres_data`, `mongodb_data`). The optional IaC overlay [`docker-compose.iac.yml`](../docker-compose.iac.yml) attaches those volumes to **Terraform-managed** external names; see [infrastructure/README.md](../infrastructure/README.md).
+
+### Optional IaC layering (Terraform, Puppet, Ansible)
+
+- **Terraform** (`infrastructure/terraform`): creates Docker **network** `app-network` and **named volumes** for Postgres/Mongo data before Compose when using the overlay.
+- **Puppet** (`infrastructure/puppet`): Hiera-driven **topic catalog** and env fragments under `infrastructure/generated/` (apply via Dockerized `puppet-agent`).
+- **Ansible** (`infrastructure/ansible`): `docker compose` (with or without overlay), **Kafka topic** creation from the catalog (`kafka-topics.sh --if-not-exists`), and **HTTP health** checks. Compose remains the **canonical container graph**; IaC tools split primitives, policy/config, and orchestration.
 
 ```mermaid
 flowchart TB
@@ -153,7 +160,7 @@ services/
   frontend-b/    # Storybook (log UI components)
   frontend-c/    # Storybook (user UI components)
   common/protos/ # gRPC contracts
-infrastructure/  # Terraform, Ansible, Puppet (local cloud simulation)
+infrastructure/  # Terraform (Docker net/volumes), Puppet (generated catalog), Ansible (deploy + Kafka topics)
 ```
 
 ---
@@ -162,4 +169,5 @@ infrastructure/  # Terraform, Ansible, Puppet (local cloud simulation)
 
 - [OVERALL.md](OVERALL.md) — standards, roadmap, responsibility matrix.
 - [API.md](API.md) — REST, gRPC, Kafka, audit routes, error mapping.
+- [INFRASTRUCTURE.md](INFRASTRUCTURE.md) — IaC, Makefile, manual E2E, lint/test in Docker.
 - [README.md](../README.md) — ports table, env vars, CI, local commands.

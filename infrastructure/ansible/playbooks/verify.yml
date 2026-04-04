@@ -1,0 +1,19 @@
+---
+- name: Post-deploy smoke checks
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  tags: [verify, smoke]
+  vars:
+    service_a_http_port: "{{ (ansible_env.SERVICE_A_HTTP_PORT | default('3000')) | int }}"
+  tasks:
+    - name: HTTP health on service-a
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ service_a_http_port }}/health"
+        method: GET
+        status_code: 200
+        timeout: 30
+      register: service_a_health
+      until: service_a_health.status is defined and service_a_health.status == 200
+      retries: 36
+      delay: 10

@@ -1,12 +1,174 @@
+# =============================================================================
+# Environment & secrets
+# =============================================================================
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Terraform variables (often contain secrets); allow examples
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+
+# =============================================================================
+# Node / TypeScript / JavaScript
+# =============================================================================
 node_modules/
-services/service-c/build/
 dist/
 storybook-static/
-coverage/
-*.out
-.pytest_cache/
+out/
+.next/
+.nuxt/
+.turbo/
+.cache/
+.parcel-cache/
+.vite/
+*.tsbuildinfo
+.eslintcache
+.stylelintcache
+.prettiercache
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# =============================================================================
+# Python
+# =============================================================================
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.pyo
+.Python
 .venv/
-.env
-!.env.example
+venv/
+ENV/
+env/
+.env.venv
+
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.hypothesis/
+.ipynb_checkpoints/
+
+# Packaging / setuptools / wheel
+*.egg
+*.egg-info/
+.eggs/
+build/
+develop-eggs/
+downloads/
+eggs/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.manifest
+*.spec
+MANIFEST
+pip-log.txt
+pip-delete-this-directory.txt
+
+# =============================================================================
+# Go
+# =============================================================================
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
+go.work
+go.work.sum
+
+# Local binary names (when built in-module)
+services/service-b/service-b
+
+# Go coverage / profiling
+coverage.out
+cover.out
+*.coverprofile
+cpu.prof
+mem.prof
+
+# =============================================================================
+# Coverage & test reports (all languages)
+# =============================================================================
+coverage/
+*.lcov
+clover.xml
+junit.xml
+.nyc_output/
+htmlcov/
+
+# Root-level aggregate
+*.out
+
+# =============================================================================
+# Terraform
+# =============================================================================
+**/.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.tfstate.lock.info
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# =============================================================================
+# Puppet
+# =============================================================================
+**/pkg/
+.spec/
+.librarian/
+.tmp/
+
+# =============================================================================
+# Ansible
+# =============================================================================
+.ansible/
+*.retry
+**/ansible_facts/
+
+# =============================================================================
+# Protobuf / Buf (local module cache)
+# =============================================================================
+.buf/
+
+# =============================================================================
+# Kafka / ZooKeeper (local simulation or extracted logs)
+# =============================================================================
+kafka-logs/
+zookeeper-data/
+zookeeper_logs/
+
+# =============================================================================
+# IaC generated (repo-specific)
+# =============================================================================
+infrastructure/generated/*
+!infrastructure/generated/.gitignore
+
+# =============================================================================
+# OS & editors
+# =============================================================================
+.DS_Store
+Thumbs.db
+*~
+*.swp
+*.swo
+.idea/
