@@ -1,3 +1,4 @@
+import { DomainEventTypeList } from "@easy-devops/log-panel";
 import type { ReactElement } from "react";
 
 function pickEnv(
@@ -9,20 +10,24 @@ function pickEnv(
 
 /**
  * Kafka is inspected via Kafka UI (separate app). This page links there and
- * documents the default user-created topic for local stacks.
+ * documents domain events for local stacks.
  */
 export function KafkaPage(): ReactElement {
   const kafkaUiUrl = pickEnv(
     import.meta.env.VITE_KAFKA_UI_URL,
     "http://localhost:8080",
   );
-  const topic = pickEnv(
-    import.meta.env.VITE_USER_CREATED_TOPIC,
-    "user.created",
+  const userEventsTopic = pickEnv(
+    import.meta.env.VITE_KAFKA_USER_EVENTS_TOPIC,
+    "user.events",
+  );
+  const roleEventsTopic = pickEnv(
+    import.meta.env.VITE_KAFKA_ROLE_EVENTS_TOPIC,
+    "role.events",
   );
 
   return (
-    <section>
+    <section className="page-section">
       <h1>Kafka</h1>
       <p>
         Browse topics, consumer groups, and messages in{" "}
@@ -33,12 +38,22 @@ export function KafkaPage(): ReactElement {
           Open Kafka UI
         </a>
       </p>
-      <h2>User events topic</h2>
+      <h2>Domain event topics</h2>
       <p>
-        Service-B publishes JSON payloads to topic <code>{topic}</code> when a
-        user is created (see API documentation). Service-C consumes matching
-        topics per its configuration.
+        Service-B publishes to <code>KAFKA_USER_EVENTS_TOPIC</code> and{" "}
+        <code>KAFKA_ROLE_EVENTS_TOPIC</code> (defaults <code>user.events</code> /{" "}
+        <code>role.events</code>). This build shows the Vite labels below for quick
+        reference.
       </p>
+      <ul>
+        <li>
+          User aggregate: <code>{userEventsTopic}</code>
+        </li>
+        <li>
+          Role aggregate: <code>{roleEventsTopic}</code>
+        </li>
+      </ul>
+      <DomainEventTypeList />
     </section>
   );
 }

@@ -106,28 +106,43 @@ func Run(opts *Options) error {
 	}
 
 	var producer *kafkaprod.Producer
-	brokers := strings.Split(os.Getenv("KAFKA_BROKERS"), ",")
-	for i := range brokers {
-		brokers[i] = strings.TrimSpace(brokers[i])
+	rawBrokers := strings.Split(os.Getenv("KAFKA_BROKERS"), ",")
+	var brokers []string
+	for _, b := range rawBrokers {
+		b = strings.TrimSpace(b)
+		if b != "" {
+			brokers = append(brokers, b)
+		}
 	}
-	topic := os.Getenv("USER_CREATED_TOPIC")
-	if topic == "" {
-		topic = "user.created"
+	userTopic := strings.TrimSpace(os.Getenv("KAFKA_USER_EVENTS_TOPIC"))
+	if userTopic == "" {
+		userTopic = "user.events"
 	}
-	if len(brokers) > 0 && brokers[0] != "" {
-		producer = kafkaprod.NewProducer(brokers, topic)
+	roleTopic := strings.TrimSpace(os.Getenv("KAFKA_ROLE_EVENTS_TOPIC"))
+	if roleTopic == "" {
+		roleTopic = "role.events"
+	}
+	if len(brokers) > 0 {
+		producer = kafkaprod.NewProducer(brokers, userTopic, roleTopic)
 		defer func() { _ = producer.Close() }()
+		log.Printf("Kafka producer enabled: user_topic=%q role_topic=%q brokers=%v", userTopic, roleTopic, brokers)
 	} else {
 		log.Println("KAFKA_BROKERS empty — Kafka producer disabled")
+	}
+
+	// Avoid passing a nil *Producer into DomainEventPublisher (typed nil makes publisher != nil in Go).
+	var publisher grpcserver.DomainEventPublisher
+	if producer != nil {
+		publisher = producer
 	}
 
 	signer := auth.NewJWTSigner(jwtSecret(), "service-b", "service-b")
 	access := accessTTL()
 	refresh := refreshTTL()
 
-	userSrv := grpcserver.NewUserServer(db, producer)
-	authSrv := grpcserver.NewAuthServer(db, signer, access, refresh, producer)
-	roleSrv := grpcserver.NewRoleServer(db)
+	userSrv := grpcserver.NewUserServer(db, publisher)
+	authSrv := grpcserver.NewAuthServer(db, signer, access, refresh, publisher)
+	roleSrv := grpcserver.NewRoleServer(db, publisher)
 
 	intercept := grpcserver.AuthUnaryInterceptor(signer, grpcserver.PublicGRPCMethods())
 	s := grpc.NewServer(grpc.ChainUnaryInterceptor(intercept))

@@ -65,17 +65,19 @@ After `docker compose up`, services publish to **localhost** unless you change t
 
    **Troubleshooting (admin UI):** The shell stores JWTs in **browser localStorage** for `http://localhost:4173`. If `/` never shows a sign-in flow and [http://localhost:4173/login](http://localhost:4173/login) says you are already signed in (or you get sent straight to `/`), you still have a valid session—use **Continue to app** or **Sign out** on that page. To force a fresh login, clear site data for `localhost:4173` (DevTools → Application → Local Storage) or remove keys `easy_devops_access_token` and `easy_devops_refresh_token`. There is no public **register** page; use the seeded admin or create users via **Users** (admin) or the API.
 
-4. **Kafka UI**: [http://localhost:8080](http://localhost:8080) — inspect the `user.created` topic.
+   **Login returns `UNAUTHENTICATED` / invalid credentials:** Default admin is **`admin` / `admin123`** (and demo **`demo` / `demo123`**). Keep `.env.example` passwords in sync with that, or your first `docker compose up` may have created `admin` with `admin123` while a later `.env` suggests a different password—the seeder does **not** update existing users. Use the password that was active on first create, or run `docker compose down -v` and bring the stack up again (this deletes Postgres data).
 
-5. **Kafka topic**: `kafka-init` in `docker-compose.infra.yml` creates `USER_CREATED_TOPIC` (default `user.created`). Service-B and Service-C start after it completes successfully.
+4. **Kafka UI**: [http://localhost:8080](http://localhost:8080) — inspect **`user.events`** and **`role.events`** (defaults; override with `KAFKA_USER_EVENTS_TOPIC` / `KAFKA_ROLE_EVENTS_TOPIC`).
 
-6. **Service-C** logs (subscribe-all pattern `.*`):
+5. **Kafka topics**: `kafka-init` in `docker-compose.infra.yml` creates both topics above. Service-B and Service-C start after it completes successfully.
+
+6. **Service-C** logs (by default it **discovers and subscribes to all** non-internal Kafka topics):
 
    ```bash
    docker compose logs -f service-c
    ```
 
-7. **End-to-end checks**: `GET /health` and `POST /users` succeed; users are stored in PostgreSQL; MongoDB collection `auditlogs` stores a row per `POST /users`; Service-B publishes JSON `user.created` events; Service-C logs consumed messages. After Kafka restarts you may briefly see `GroupCoordinatorNotAvailableError` in Service-C until the group coordinator is ready.
+7. **End-to-end checks**: `GET /health` and `POST /users` succeed; users are stored in PostgreSQL; MongoDB collection `auditlogs` stores audit rows for successful gateway calls (see [docs/API.md](docs/API.md)); Service-B publishes JSON domain events to **`user.events`** / **`role.events`**; Service-C logs consumed messages. After Kafka restarts you may briefly see `GroupCoordinatorNotAvailableError` in Service-C until the group coordinator is ready.
 
 ### Docker Hub rate limit (`toomanyrequests: Rate exceeded`)
 
@@ -151,7 +153,7 @@ Configure hosts and secrets via `.env` / `.env.example` (databases, Kafka, gRPC)
 | `POSTGRES_*` | Postgres container settings in `docker-compose.infra.yml` |
 | `POSTGRES_DSN` | Service-B GORM DSN (wired in Compose) |
 | `KAFKA_BROKERS` | e.g. `kafka:9092` on the Docker network |
-| `USER_CREATED_TOPIC` | Default `user.created` |
+| `KAFKA_USER_EVENTS_TOPIC` / `KAFKA_ROLE_EVENTS_TOPIC` | Defaults `user.events` / `role.events` (Service-B producer + `kafka-init`) |
 | `GRPC_HOST` / `GRPC_PORT` | Service-A → Service-B gRPC |
 | `USER_PROTO_ROOT` | Service-A: directory with `user/`, `auth/`, `role/` proto trees (Docker: `/app/protos`) |
 | `JWT_SECRET` | Service-B: HMAC key for access JWTs |

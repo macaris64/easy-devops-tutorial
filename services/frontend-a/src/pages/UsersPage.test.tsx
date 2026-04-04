@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { AuthProvider } from "../auth/AuthContext";
 import {
   authTestCleanup,
+  isRolesListGet,
   isUsersListGet,
   primeSession,
   stubFetchWithMe,
@@ -22,6 +23,12 @@ describe("UsersPage", () => {
     primeSession();
     stubFetchWithMe(testAdminUser, (url, init) => {
       if (isUsersListGet(url, init)) {
+        return {
+          ok: true,
+          json: () => Promise.resolve([]),
+        } as Response;
+      }
+      if (isRolesListGet(url, init)) {
         return {
           ok: true,
           json: () => Promise.resolve([]),

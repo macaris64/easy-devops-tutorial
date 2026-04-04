@@ -5,6 +5,7 @@ import { App } from "./App";
 import { AuthProvider } from "./auth/AuthContext";
 import {
   authTestCleanup,
+  isRolesListGet,
   isUsersListGet,
   primeSession,
   stubFetchWithMe,
@@ -55,6 +56,12 @@ describe("App", () => {
           json: () => Promise.resolve([]),
         } as Response;
       }
+      if (isRolesListGet(url, init)) {
+        return {
+          ok: true,
+          json: () => Promise.resolve([]),
+        } as Response;
+      }
       return undefined;
     });
     render(
@@ -66,6 +73,29 @@ describe("App", () => {
     );
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: "Users" })).toBeInTheDocument();
+    });
+  });
+
+  it("renders roles route for admin", async () => {
+    primeSession();
+    stubFetchWithMe(testAdminUser, (url, init) => {
+      if (isRolesListGet(url, init)) {
+        return {
+          ok: true,
+          json: () => Promise.resolve([]),
+        } as Response;
+      }
+      return undefined;
+    });
+    render(
+      <MemoryRouter initialEntries={["/roles"]}>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Roles" })).toBeInTheDocument();
     });
   });
 

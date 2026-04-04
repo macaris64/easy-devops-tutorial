@@ -1,14 +1,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { authTestCleanup, primeSession } from "../test/authTestUtils";
 import {
+  assignUserRole,
   createUser,
   deleteUser,
   fetchAuditLogs,
   fetchMe,
   fetchUser,
+  listRoles,
   listUsers,
   login,
   logout,
+  removeUserRole,
   updateUser,
 } from "./gateway";
 
@@ -65,6 +68,7 @@ describe("gateway", () => {
   });
 
   it("fetchAuditLogs returns array", async () => {
+    primeSession();
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
@@ -83,9 +87,58 @@ describe("gateway", () => {
     const rows = await fetchAuditLogs();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toEqual(expect.objectContaining({ path: "/" }));
+    const init = vi.mocked(fetch).mock.calls[0]?.[1];
+    expect(init?.headers).toBeInstanceOf(Headers);
+    expect((init?.headers as Headers).get("Authorization")).toBe(
+      "Bearer test-access",
+    );
+  });
+
+  it("fetchAuditLogs adds query params", async () => {
+    primeSession();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve([]),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await fetchAuditLogs({ path: "/users", method: "GET", q: "needle", limit: 50 });
+    const u = String(fetchMock.mock.calls[0]?.[0]);
+    expect(u.startsWith("/api/audit-logs?")).toBe(true);
+    expect(u).toContain("path=");
+    expect(u).toContain("method=GET");
+    expect(u).toContain("q=needle");
+    expect(u).toContain("limit=50");
+  });
+
+  it("fetchAuditLogs floors limit and skips NaN", async () => {
+    primeSession();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve([]),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await fetchAuditLogs({ limit: 12.7 });
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("limit=12");
+    fetchMock.mockClear();
+    await fetchAuditLogs({ limit: Number.NaN });
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/audit-logs");
+  });
+
+  it("fetchAuditLogs throws on error response", async () => {
+    primeSession();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        statusText: "Bad",
+        json: () => Promise.resolve({ error: "denied" }),
+      }),
+    );
+    await expect(fetchAuditLogs()).rejects.toThrow("denied");
   });
 
   it("fetchAuditLogs throws on non-array", async () => {
+    primeSession();
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
@@ -94,6 +147,56 @@ describe("gateway", () => {
       }),
     );
     await expect(fetchAuditLogs()).rejects.toThrow("invalid audit log response");
+  });
+
+  it("assignUserRole POSTs encoded user id", async () => {
+    primeSession();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 204,
+      }),
+    );
+    await assignUserRole("u/1", "role-1");
+    expect(vi.mocked(fetch).mock.calls[0]?.[0]).toBe("/api/users/u%2F1/roles");
+    expect(vi.mocked(fetch).mock.calls[0]?.[1]).toEqual(
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ roleId: "role-1" }),
+      }),
+    );
+  });
+
+  it("removeUserRole DELETEs encoded path", async () => {
+    primeSession();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 204,
+      }),
+    );
+    await removeUserRole("u 1", "r/2");
+    expect(vi.mocked(fetch).mock.calls[0]?.[0]).toBe(
+      "/api/users/u%201/roles/r%2F2",
+    );
+    expect(vi.mocked(fetch).mock.calls[0]?.[1]).toEqual(
+      expect.objectContaining({ method: "DELETE" }),
+    );
+  });
+
+  it("removeUserRole throws on error response", async () => {
+    primeSession();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        statusText: "Bad",
+        json: () => Promise.resolve({ error: "nope" }),
+      }),
+    );
+    await expect(removeUserRole("u", "r")).rejects.toThrow("nope");
   });
 
   it("fetchUser GETs encoded id", async () => {
@@ -263,6 +366,76 @@ describe("gateway", () => {
     );
     const list = await listUsers();
     expect(list).toHaveLength(1);
+  });
+
+  it("listUsers adds q and role query params", async () => {
+    primeSession();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve([]),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await listUsers({ query: "a", role: "admin" });
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/users?q=a&role=admin");
+  });
+
+  it("listUsers adds only role when query blank", async () => {
+    primeSession();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve([]),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await listUsers({ query: "  ", role: "admin" });
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/users?role=admin");
+  });
+
+  it("listUsers skips all-blank filters", async () => {
+    primeSession();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve([]),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await listUsers({ query: "  ", role: "  " });
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/users");
+  });
+
+  it("listRoles returns array", async () => {
+    primeSession();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve([{ id: "r1", name: "admin" }]),
+      }),
+    );
+    const list = await listRoles();
+    expect(list).toHaveLength(1);
+    expect(list[0].name).toBe("admin");
+  });
+
+  it("listRoles adds q query param", async () => {
+    primeSession();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve([]),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await listRoles({ query: "ed" });
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/roles?q=ed");
+  });
+
+  it("listRoles throws on non-array", async () => {
+    primeSession();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({}),
+      }),
+    );
+    await expect(listRoles()).rejects.toThrow("invalid roles response");
   });
 
   it("listUsers throws on non-array", async () => {

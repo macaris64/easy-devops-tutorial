@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { UserListTable } from "./UserListTable";
@@ -58,5 +58,48 @@ describe("UserListTable", () => {
     );
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onEditCancel).toHaveBeenCalled();
+  });
+
+  it("assigns role when Assign is clicked", async () => {
+    const user = userEvent.setup();
+    const onAssignRole = vi.fn().mockResolvedValue(undefined);
+    const onRemoveRole = vi.fn().mockResolvedValue(undefined);
+    render(
+      <UserListTable
+        users={[{ id: "u1", username: "a", email: "a@a.com", roles: [] }]}
+        roleOptions={[
+          { id: "r1", name: "editor" },
+          { id: "r2", name: "admin" },
+        ]}
+        onAssignRole={onAssignRole}
+        onRemoveRole={onRemoveRole}
+      />,
+    );
+    await user.selectOptions(
+      screen.getByLabelText(/assign role to a/i),
+      "r1",
+    );
+    await user.click(screen.getByTestId("assign-role-u1"));
+    await waitFor(() => {
+      expect(onAssignRole).toHaveBeenCalledWith("u1", "r1");
+    });
+  });
+
+  it("removes role when Remove is clicked", async () => {
+    const user = userEvent.setup();
+    const onAssignRole = vi.fn().mockResolvedValue(undefined);
+    const onRemoveRole = vi.fn().mockResolvedValue(undefined);
+    render(
+      <UserListTable
+        users={[{ id: "u1", username: "a", email: "a@a.com", roles: ["editor"] }]}
+        roleOptions={[{ id: "r1", name: "editor" }]}
+        onAssignRole={onAssignRole}
+        onRemoveRole={onRemoveRole}
+      />,
+    );
+    await user.click(screen.getByTestId("remove-role-u1-r1"));
+    await waitFor(() => {
+      expect(onRemoveRole).toHaveBeenCalledWith("u1", "r1");
+    });
   });
 });

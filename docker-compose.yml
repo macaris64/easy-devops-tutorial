@@ -12,7 +12,8 @@ services:
     environment:
       POSTGRES_DSN: host=postgres user=${POSTGRES_USER:-postgres} password=${POSTGRES_PASSWORD:-postgres} dbname=${POSTGRES_DB:-users} port=5432 sslmode=disable
       KAFKA_BROKERS: ${KAFKA_BROKERS:-kafka:9092}
-      USER_CREATED_TOPIC: ${USER_CREATED_TOPIC:-user.created}
+      KAFKA_USER_EVENTS_TOPIC: ${KAFKA_USER_EVENTS_TOPIC:-user.events}
+      KAFKA_ROLE_EVENTS_TOPIC: ${KAFKA_ROLE_EVENTS_TOPIC:-role.events}
       GRPC_LISTEN_ADDR: ${GRPC_LISTEN_ADDR:-:50051}
       JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret-change-me}
       BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME:-admin}
@@ -64,7 +65,10 @@ services:
     environment:
       KAFKA_BROKERS: ${KAFKA_BROKERS:-kafka:9092}
       KAFKA_GROUP_ID: ${KAFKA_GROUP_ID:-service-c-all-topics}
+      # Default: discover all non-internal topics at startup (user.events, role.events, etc.)
+      KAFKA_DISCOVER_ALL_TOPICS: ${KAFKA_DISCOVER_ALL_TOPICS:-1}
       KAFKA_TOPIC_PATTERN: ${KAFKA_TOPIC_PATTERN:-.*}
+      KAFKA_METADATA_MAX_AGE_MS: ${KAFKA_METADATA_MAX_AGE_MS:-30000}
       KAFKA_AUTO_OFFSET_RESET: ${KAFKA_AUTO_OFFSET_RESET:-earliest}
     depends_on:
       kafka:
@@ -81,7 +85,8 @@ services:
       args:
         VITE_API_PREFIX: ${FRONTEND_A_VITE_API_PREFIX:-/api}
         VITE_KAFKA_UI_URL: ${FRONTEND_A_VITE_KAFKA_UI_URL:-http://localhost:8080}
-        VITE_USER_CREATED_TOPIC: ${USER_CREATED_TOPIC:-user.created}
+        VITE_KAFKA_USER_EVENTS_TOPIC: ${FRONTEND_A_VITE_KAFKA_USER_EVENTS_TOPIC:-${KAFKA_USER_EVENTS_TOPIC:-user.events}}
+        VITE_KAFKA_ROLE_EVENTS_TOPIC: ${FRONTEND_A_VITE_KAFKA_ROLE_EVENTS_TOPIC:-${KAFKA_ROLE_EVENTS_TOPIC:-role.events}}
     container_name: frontend-a
     ports:
       - "${FRONTEND_A_PORT:-4173}:80"

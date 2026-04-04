@@ -1,7 +1,14 @@
 import mongoose from "mongoose";
+import type { AuditLogListQuery } from "./app";
 import { createApp } from "./app";
 import { AuditLog } from "./auditLog";
+import type { LeanAuditDoc } from "./auditLogRow";
+import { leanAuditDocToRow } from "./auditLogRow";
 import { buildGrpcBackendFromEnv } from "./grpcBackend";
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 const mongoUri =
   process.env.MONGO_URI || "mongodb://localhost:27017/service_a";
@@ -24,22 +31,42 @@ const app = createApp(
     saveAuditLog: async (entry) => {
       await AuditLog.create(entry);
     },
-    listAuditLogs: async () => {
-      const docs = await AuditLog.find()
+    listAuditLogs: async (query?: AuditLogListQuery) => {
+      const filter: Record<string, unknown> = {};
+      if (query?.path?.trim()) {
+        filter.path = new RegExp(escapeRegExp(query.path.trim()), "i");
+      }
+      if (query?.method?.trim()) {
+        filter.method = new RegExp(
+          `^${escapeRegExp(query.method.trim())}$`,
+          "i",
+        );
+      }
+      const cap = Math.min(500, Math.max(1, query?.limit ?? 100));
+      const needPayloadScan = Boolean(query?.q?.trim());
+      const fetchLimit = needPayloadScan ? Math.min(cap * 5, 500) : cap;
+      let docs = await AuditLog.find(filter)
         .sort({ createdAt: -1 })
-        .limit(100)
+        .limit(fetchLimit)
         .lean();
-      return docs.map((d) => ({
-        id: String(d._id),
-        path: d.path,
-        method: d.method,
-        createdAt:
-          d.createdAt instanceof Date
-            ? d.createdAt.toISOString()
-            : new Date(d.createdAt as string).toISOString(),
-        payload: d.payload as Record<string, unknown>,
-        createdUserId: d.createdUserId,
-      }));
+      if (needPayloadScan && query?.q?.trim()) {
+        const needle = query.q.trim().toLowerCase();
+        docs = docs.filter((d) => {
+          const doc = d as LeanAuditDoc;
+          const p = String(doc.path ?? "").toLowerCase();
+          const m = String(doc.method ?? "").toLowerCase();
+          const pay = JSON.stringify(doc.payload ?? {}).toLowerCase();
+          const uid = String(doc.createdUserId ?? "").toLowerCase();
+          return (
+            p.includes(needle) ||
+            m.includes(needle) ||
+            pay.includes(needle) ||
+            uid.includes(needle)
+          );
+        });
+        docs = docs.slice(0, cap);
+      }
+      return docs.map((d) => leanAuditDocToRow(d as LeanAuditDoc));
     },
   },
   corsOptions,

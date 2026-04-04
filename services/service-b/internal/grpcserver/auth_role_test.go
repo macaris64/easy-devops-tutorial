@@ -103,7 +103,7 @@ func TestAuthServer_ForgotResetPassword(t *testing.T) {
 
 func TestRoleServer_CRUD(t *testing.T) {
 	db := openTestDB(t, "_auth")
-	rs := NewRoleServer(db)
+	rs := NewRoleServer(db, nil)
 	ctx := adminClaimsCtx(t, db)
 
 	r, err := rs.CreateRole(ctx, &rolev1.CreateRoleRequest{Name: "editor"})
@@ -118,6 +118,11 @@ func TestRoleServer_CRUD(t *testing.T) {
 	if err != nil || len(list.Roles) < 3 {
 		t.Fatalf("%v", list)
 	}
+	q := "edit"
+	listQ, err := rs.ListRoles(ctx, &rolev1.ListRolesRequest{Query: &q})
+	if err != nil || len(listQ.Roles) != 1 || listQ.Roles[0].Name != "editor" {
+		t.Fatalf("ListRoles query: %v %+v", err, listQ)
+	}
 	up, err := rs.UpdateRole(ctx, &rolev1.UpdateRoleRequest{Id: r.Id, Name: "editor2"})
 	if err != nil || up.Name != "editor2" {
 		t.Fatal(err)
@@ -130,7 +135,7 @@ func TestRoleServer_CRUD(t *testing.T) {
 
 func TestRoleServer_AssignRemoveUserRole(t *testing.T) {
 	db := openTestDB(t, "_auth")
-	rs := NewRoleServer(db)
+	rs := NewRoleServer(db, nil)
 	ctx := adminClaimsCtx(t, db)
 
 	role, err := rs.CreateRole(ctx, &rolev1.CreateRoleRequest{Name: "r1"})

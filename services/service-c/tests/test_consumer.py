@@ -8,19 +8,29 @@ from src.consumer import default_process_message, run_consumer
 
 class _FakeMsg:
     def __init__(self) -> None:
-        self.topic = "user.created"
+        self.topic = "user.events"
         self.partition = 0
         self.offset = 42
         self.key = b"uid"
-        self.value = b'{"event":"user.created"}'
+        self.value = b'{"event":"user","data":"user.created"}'
 
 
 class _FakeConsumer:
     def __init__(self, *_a: Any, **_kw: Any) -> None:
         self._msg = _FakeMsg()
+        self.subscribed_topics: list[str] | None = None
+        self.pattern: str | None = None
 
-    def subscribe(self, pattern: str | None = None) -> None:
-        self.pattern = pattern
+    def subscribe(
+        self,
+        topics: tuple[str, ...] | list[str] = (),
+        pattern: str | None = None,
+        listener: Any = None,
+    ) -> None:
+        if topics:
+            self.subscribed_topics = list(topics)
+        if pattern is not None:
+            self.pattern = pattern
 
     async def start(self) -> None:
         self.started = True
@@ -46,6 +56,7 @@ async def test_run_consumer_processes_one_message(
     monkeypatch.setenv("KAFKA_BROKERS", "localhost:9092")
     monkeypatch.setenv("KAFKA_GROUP_ID", "test-group")
     monkeypatch.setenv("KAFKA_TOPIC_PATTERN", ".*")
+    monkeypatch.setenv("KAFKA_DISCOVER_ALL_TOPICS", "0")
     seen: list[tuple[Any, ...]] = []
 
     async def proc(
@@ -62,7 +73,7 @@ async def test_run_consumer_processes_one_message(
         consumer_factory=_FakeConsumer,
     )
     assert len(seen) == 1
-    assert seen[0][0] == "user.created"
+    assert seen[0][0] == "user.events"
     assert seen[0][3] == "uid"
 
 
@@ -71,6 +82,7 @@ async def test_run_consumer_handler_error_continues(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("KAFKA_BROKERS", "localhost:9092")
+    monkeypatch.setenv("KAFKA_DISCOVER_ALL_TOPICS", "0")
 
     class _TwoMsgConsumer(_FakeConsumer):
         def __init__(self, *_a: Any, **_kw: Any) -> None:
@@ -95,6 +107,34 @@ async def test_run_consumer_handler_error_continues(
         consumer_factory=_TwoMsgConsumer,
     )
     assert calls == 2
+
+
+@pytest.mark.asyncio
+async def test_run_consumer_discovery_subscribes_to_topic_list(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import src.consumer as consumer_mod
+
+    monkeypatch.setenv("KAFKA_BROKERS", "localhost:9092")
+    monkeypatch.setenv("KAFKA_GROUP_ID", "test-group")
+    monkeypatch.setenv("KAFKA_DISCOVER_ALL_TOPICS", "1")
+
+    async def fake_list(_brokers: list[str]) -> list[str]:
+        return ["role.events", "user.events"]
+
+    monkeypatch.setattr(consumer_mod, "list_public_topics", fake_list)
+
+    c: _FakeConsumer | None = None
+
+    def factory(*a: Any, **kw: Any) -> _FakeConsumer:
+        nonlocal c
+        c = _FakeConsumer(*a, **kw)
+        return c
+
+    await run_consumer(consumer_factory=factory)
+    assert c is not None
+    assert c.subscribed_topics == ["role.events", "user.events"]
+    assert c.pattern is None
 
 
 @pytest.mark.asyncio

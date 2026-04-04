@@ -21,7 +21,12 @@ message CreateUserRequest {
   optional string password = 3;
 }
 
-message ListUsersRequest {}
+message ListUsersRequest {
+  // Substring match on username or email (case-insensitive). Empty = no filter.
+  optional string query = 1;
+  // Filter users that have this role name (e.g. "admin"). Empty = no filter.
+  optional string role = 2;
+}
 
 message ListUsersResponse {
   repeated User users = 1;

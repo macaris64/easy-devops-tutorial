@@ -86,12 +86,20 @@ services:
     entrypoint: ["/bin/bash", "-lc"]
     command:
       - |
-        /opt/bitnami/kafka/bin/kafka-topics.sh --create --if-not-exists \
-          --bootstrap-server kafka:9092 \
-          --topic "${USER_CREATED_TOPIC:-user.created}" \
-          --partitions 1 --replication-factor 1
+        set -eo pipefail
+        # Topics match service-b bootstrap (KAFKA_USER_EVENTS_TOPIC / KAFKA_ROLE_EVENTS_TOPIC); $$ escapes $ for Compose.
+        UT="$${KAFKA_USER_EVENTS_TOPIC:-user.events}"
+        RT="$${KAFKA_ROLE_EVENTS_TOPIC:-role.events}"
+        for T in "$$UT" "$$RT"; do
+          echo "kafka-init: ensuring topic exists: $$T"
+          /opt/bitnami/kafka/bin/kafka-topics.sh --create --if-not-exists \
+            --bootstrap-server kafka:9092 \
+            --topic "$$T" \
+            --partitions 1 --replication-factor 1
+        done
     environment:
-      USER_CREATED_TOPIC: ${USER_CREATED_TOPIC:-user.created}
+      KAFKA_USER_EVENTS_TOPIC: ${KAFKA_USER_EVENTS_TOPIC:-user.events}
+      KAFKA_ROLE_EVENTS_TOPIC: ${KAFKA_ROLE_EVENTS_TOPIC:-role.events}
     networks:
       - app-network
 

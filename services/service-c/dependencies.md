@@ -2,7 +2,7 @@
 
 | Package | Role |
 |---------|------|
-| `aiokafka` | Async Kafka consumer; topic regex from `KAFKA_TOPIC_PATTERN` (default `.*`) |
+| `aiokafka` | Async consumer; default **topic discovery** (`KAFKA_DISCOVER_ALL_TOPICS`) lists all public topics, or regex via `KAFKA_TOPIC_PATTERN` |
 
 Dev / tooling (see `pyproject.toml` `[project.optional-dependencies] dev`): `pytest`, `pytest-asyncio`, `pytest-cov`, `ruff`.
 

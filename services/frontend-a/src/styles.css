@@ -1,8 +1,8 @@
 :root {
-  font-family: system-ui, sans-serif;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   line-height: 1.5;
   color: #0f172a;
-  background: #f8fafc;
+  background: #f1f5f9;
 }
 
 body {
@@ -16,62 +16,108 @@ body {
 }
 
 .admin-header {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 1.5rem;
-  padding: 0.75rem 1.25rem;
-  background: #0f172a;
+  background: linear-gradient(165deg, #0f172a 0%, #1e293b 55%, #0f172a 100%);
   color: #f8fafc;
+  padding: 0.85rem 1.5rem 1rem;
+  box-shadow: 0 4px 24px rgb(15 23 42 / 0.35);
+}
+
+.admin-header-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.admin-header-brand {
+  display: flex;
+  align-items: baseline;
+  gap: 0.65rem;
 }
 
 .admin-brand {
-  font-size: 1.1rem;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
 }
 
-.admin-nav {
-  display: flex;
-  gap: 1rem;
-}
-
-.admin-nav-link {
+.admin-brand-sub {
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
   color: #94a3b8;
-  text-decoration: none;
 }
 
-.admin-nav-link.active {
+.admin-nav-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+  padding: 0.3rem;
+  background: rgb(15 23 42 / 0.55);
+  border-radius: 12px;
+  border: 1px solid rgb(148 163 184 / 0.15);
+}
+
+.admin-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  border-radius: 9px;
+  color: #cbd5e1;
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.admin-tab:hover {
   color: #f8fafc;
+  background: rgb(51 65 85 / 0.5);
+}
+
+.admin-tab-active {
+  color: #f8fafc !important;
+  background: #334155 !important;
+  border-color: rgb(148 163 184 / 0.25);
   font-weight: 600;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.2);
+}
+
+.admin-tab-ghost {
+  background: transparent;
+  color: #cbd5e1;
+  cursor: pointer;
+  font: inherit;
+}
+
+.admin-tab-ghost:hover {
+  color: #f8fafc;
+  background: rgb(51 65 85 / 0.45);
 }
 
 .admin-header-account {
-  margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.5rem;
   flex-wrap: wrap;
 }
 
 .admin-profile-user {
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   color: #e2e8f0;
+  margin-right: 0.35rem;
 }
 
 .admin-profile-email {
   color: #94a3b8;
   font-weight: 400;
-}
-
-.admin-nav-button {
-  background: none;
-  border: none;
-  padding: 0;
-  font: inherit;
-  cursor: pointer;
-}
-
-.admin-nav-button:hover {
-  color: #f8fafc;
 }
 
 .login-shell {
@@ -81,8 +127,26 @@ body {
 }
 
 .admin-main {
-  padding: 1.25rem;
-  max-width: 960px;
+  padding: 1.5rem clamp(1rem, 4vw, 2rem);
+  max-width: 72rem;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.page-section {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 0.06);
+}
+
+.page-section h1 {
+  margin-top: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
 .field {
@@ -117,6 +181,15 @@ body {
   border: 1px solid #e2e8f0;
   padding: 0.35rem 0.5rem;
   text-align: left;
+}
+
+.log-entry-payload {
+  display: block;
+  max-width: 36rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.75rem;
+  font-weight: normal;
 }
 
 .log-panel-header {
@@ -226,4 +299,35 @@ body {
 .users-admin-only {
   color: #64748b;
   margin-bottom: 1rem;
+}
+
+.user-list-roles-cell {
+  min-width: 12rem;
+  font-size: 0.8125rem;
+}
+
+.user-list-role-tags {
+  list-style: none;
+  margin: 0 0 0.5rem;
+  padding: 0;
+}
+
+.user-list-role-tags li {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.25rem;
+}
+
+.user-list-role-remove {
+  font-size: 0.75rem;
+  padding: 0.15rem 0.35rem;
+  cursor: pointer;
+}
+
+.user-list-role-assign {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
 }

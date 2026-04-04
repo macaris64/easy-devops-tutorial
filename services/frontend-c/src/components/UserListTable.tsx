@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
-import type { CreatedUser } from "../types";
+import { useState } from "react";
+import type { CreatedUser, RoleOption } from "../types";
 
 export interface UserListTableProps {
   users: CreatedUser[];
@@ -11,6 +12,11 @@ export interface UserListTableProps {
   onEditSave?: (userId: string) => void;
   onEditCancel?: () => void;
   onDelete?: (userId: string) => void;
+  /** When set with callbacks, shows assign/remove controls (role ids from API). */
+  roleOptions?: RoleOption[];
+  busyRoleUserId?: string | null;
+  onAssignRole?: (userId: string, roleId: string) => Promise<void>;
+  onRemoveRole?: (userId: string, roleId: string) => Promise<void>;
 }
 
 /**
@@ -26,7 +32,16 @@ export function UserListTable({
   onEditSave,
   onEditCancel,
   onDelete,
+  roleOptions,
+  busyRoleUserId,
+  onAssignRole,
+  onRemoveRole,
 }: UserListTableProps): ReactElement {
+  const [assignPick, setAssignPick] = useState<Record<string, string>>({});
+  const showRoleControls =
+    Boolean(roleOptions?.length) &&
+    Boolean(onAssignRole) &&
+    Boolean(onRemoveRole);
   const showActions =
     Boolean(onEditStart) ||
     Boolean(onDelete) ||
@@ -60,7 +75,76 @@ export function UserListTable({
               )}
             </td>
             <td>{u.email}</td>
-            <td>{(u.roles ?? []).join(", ") || "—"}</td>
+            <td>
+              {showRoleControls && roleOptions ? (
+                <div className="user-list-roles-cell" data-testid={`user-roles-cell-${u.id}`}>
+                  <ul className="user-list-role-tags">
+                    {(u.roles ?? []).map((name) => {
+                      const r = roleOptions.find((x) => x.name === name);
+                      return (
+                        <li key={name}>
+                          <span>{name}</span>
+                          {r ? (
+                            <button
+                              type="button"
+                              className="user-list-role-remove"
+                              disabled={busyRoleUserId === u.id}
+                              data-testid={`remove-role-${u.id}-${r.id}`}
+                              onClick={() => {
+                                if (onRemoveRole) {
+                                  void onRemoveRole(u.id, r.id);
+                                }
+                              }}
+                            >
+                              Remove
+                            </button>
+                          ) : null}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  <div className="user-list-role-assign">
+                    <select
+                      aria-label={`Assign role to ${u.username}`}
+                      value={assignPick[u.id] ?? ""}
+                      disabled={busyRoleUserId === u.id}
+                      onChange={(ev) => {
+                        setAssignPick((prev) => ({ ...prev, [u.id]: ev.target.value }));
+                      }}
+                    >
+                      <option value="">Assign role…</option>
+                      {roleOptions
+                        .filter((r) => !(u.roles ?? []).includes(r.name))
+                        .map((r) => (
+                          <option key={r.id} value={r.id}>
+                            {r.name}
+                          </option>
+                        ))}
+                    </select>
+                    <button
+                      type="button"
+                      disabled={
+                        busyRoleUserId === u.id || !(assignPick[u.id] && assignPick[u.id].length > 0)
+                      }
+                      data-testid={`assign-role-${u.id}`}
+                      onClick={() => {
+                        const rid = assignPick[u.id];
+                        if (!rid || !onAssignRole) {
+                          return;
+                        }
+                        void onAssignRole(u.id, rid).then(() => {
+                          setAssignPick((prev) => ({ ...prev, [u.id]: "" }));
+                        });
+                      }}
+                    >
+                      Assign
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                (u.roles ?? []).join(", ") || "—"
+              )}
+            </td>
             {showActions ? (
               <td>
                 {editingUserId === u.id ? (

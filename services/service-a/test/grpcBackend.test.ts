@@ -142,6 +142,62 @@ describe("buildGrpcBackend", () => {
     await expect(backend.listUsers("Bearer x")).resolves.toEqual([user]);
   });
 
+  it("listUsers forwards trimmed query and role", async () => {
+    let seen: unknown;
+    const US = serviceCtor({
+      GetUser(_req, _md, cb) {
+        cb(null, user);
+      },
+      CreateUser(_req, _md, cb) {
+        cb(null, user);
+      },
+      ListUsers(req, _md, cb) {
+        seen = req;
+        cb(null, { users: [user] });
+      },
+      UpdateUser(_req, _md, cb) {
+        cb(null, user);
+      },
+      DeleteUser(_req, _md, cb) {
+        cb(null, user);
+      },
+    });
+    const b = buildGrpcBackend(US, AuthService, RoleService, "localhost:9");
+    await b.listUsers("Bearer x", { query: "  jo  ", role: " admin " });
+    expect(seen).toEqual({ query: "jo", role: "admin" });
+  });
+
+  it("listRoles forwards trimmed query", async () => {
+    let seen: unknown;
+    const RS = serviceCtor({
+      ListRoles(req, _md, cb) {
+        seen = req;
+        cb(null, { roles: [{ id: "r1", name: "admin" }] });
+      },
+      CreateRole(_req, _md, cb) {
+        cb(null, { id: "r2", name: "new" });
+      },
+      GetRole(_req, _md, cb) {
+        cb(null, { id: "r1", name: "admin" });
+      },
+      UpdateRole(_req, _md, cb) {
+        cb(null, { id: "r1", name: "updated" });
+      },
+      DeleteRole(_req, _md, cb) {
+        cb(null, { id: "r1", name: "admin" });
+      },
+      AssignUserRole(_req, _md, cb) {
+        cb(null, {});
+      },
+      RemoveUserRole(_req, _md, cb) {
+        cb(null, {});
+      },
+    });
+    const b = buildGrpcBackend(UserService, AuthService, RS, "localhost:9");
+    await b.listRoles("Bearer x", { query: "  adm  " });
+    expect(seen).toEqual({ query: "adm" });
+  });
+
   it("updateUser with partial patch", async () => {
     await expect(
       backend.updateUser("Bearer x", "1", { username: "n" }),

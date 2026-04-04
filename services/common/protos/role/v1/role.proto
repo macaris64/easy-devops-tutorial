@@ -26,7 +26,10 @@ message DeleteRoleRequest {
   string id = 1;
 }
 
-message ListRolesRequest {}
+message ListRolesRequest {
+  // Substring match on role name (case-insensitive). Empty = no filter.
+  optional string query = 1;
+}
 
 message ListRolesResponse {
   repeated Role roles = 1;

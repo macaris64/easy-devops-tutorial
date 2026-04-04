@@ -1,12 +1,18 @@
-import { normalizeUserIdParam } from "../src/paramUtils";
+import { pickQueryString } from "../src/paramUtils";
 
-describe("normalizeUserIdParam", () => {
-  it("returns empty for undefined", () => {
-    expect(normalizeUserIdParam(undefined)).toBe("");
+describe("pickQueryString", () => {
+  it("returns undefined for empty", () => {
+    expect(pickQueryString(undefined)).toBeUndefined();
+    expect(pickQueryString("")).toBeUndefined();
+    expect(pickQueryString("   ")).toBeUndefined();
+    expect(pickQueryString(1)).toBeUndefined();
   });
 
-  it("trims string ids", () => {
-    expect(normalizeUserIdParam("  abc  ")).toBe("abc");
+  it("trims string", () => {
+    expect(pickQueryString("  x  ")).toBe("x");
   });
 
+  it("uses first array element", () => {
+    expect(pickQueryString(["  y  ", "z"])).toBe("y");
+  });
 });
