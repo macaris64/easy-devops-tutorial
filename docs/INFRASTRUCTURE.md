@@ -140,6 +140,12 @@ docker run --rm -v "$(pwd)/services/service-c:/app" -w /app python:3.11-slim bas
 
 No cloud provider is used; this is an **integration smoke** of the IaC path.
 
+### Docker Hub rate limits on GitHub-hosted runners
+
+Anonymous pulls share IP quotas; `docker compose up` pulls many images at once (Kafka UI and application base images such as Node, Go, and Nginx), which can fail with `toomanyrequests: Rate exceeded`.
+
+The workflow **pre-pulls images one at a time with retries** before Ansible runs. For extra headroom, add repository secrets **`DOCKERHUB_USERNAME`** and **`DOCKERHUB_TOKEN`** (a [Docker Hub access token](https://docs.docker.com/docker-hub/access-tokens/)); the workflow logs in to Docker Hub when both are set.
+
 ---
 
 ## Related documentation

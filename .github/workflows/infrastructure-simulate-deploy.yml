@@ -83,6 +83,46 @@ jobs:
           cp .env.example .env
           cat infrastructure/generated/compose.env.fragment >> .env
 
+      # Shared runner IPs hit Docker Hub anonymous limits when compose pulls many
+      # images in parallel (Kafka UI + Node/Go/Nginx bases). Log in if secrets exist,
+      # then pre-pull sequentially so `docker compose up` mostly uses the cache.
+      - name: Log in to Docker Hub (optional)
+        if: ${{ secrets.DOCKERHUB_USERNAME && secrets.DOCKERHUB_TOKEN }}
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Pre-pull container images (sequential + retry)
+        run: |
+          set -euo pipefail
+          pull_retry() {
+            local name="$1"
+            local i
+            for i in 1 2 3 4 5; do
+              if docker pull "$name"; then
+                return 0
+              fi
+              echo "docker pull attempt $i failed for $name; backing off..."
+              sleep $((i * 20))
+            done
+            echo "docker pull failed after retries: $name"
+            return 1
+          }
+          # Infra (defaults match docker-compose.infra.yml / .env.example)
+          pull_retry public.ecr.aws/docker/library/mongo:7
+          pull_retry public.ecr.aws/docker/library/postgres:16-alpine
+          pull_retry public.ecr.aws/bitnami/zookeeper:3.9
+          pull_retry public.ecr.aws/bitnami/kafka:3.6
+          pull_retry provectuslabs/kafka-ui:v0.7.2
+          # Application Dockerfile bases (same tags as service Dockerfiles)
+          pull_retry golang:1.22-bookworm
+          pull_retry node:20-bookworm
+          pull_retry node:20-bookworm-slim
+          pull_retry python:3.11-slim
+          pull_retry nginx:1.27-alpine
+          pull_retry gcr.io/distroless/static-debian12:nonroot
+
       - name: Ansible site (Compose, Kafka topics, health)
         working-directory: infrastructure/ansible
         run: ansible-playbook -i inventory/hosts.yml playbooks/site.yml
