@@ -65,18 +65,21 @@ func TestUserServer_ListUsers_queryAndRoleFilter(t *testing.T) {
 		t.Fatal(err)
 	}
 	var ru model.Role
-	if err := db.Where("name = ?", model.RoleUser).First(&ru).Error; err != nil {
+	err = db.Where("name = ?", model.RoleUser).First(&ru).Error
+	if err != nil {
 		t.Fatal(err)
 	}
 	u1 := model.User{ID: "lf1", Username: "alpha_search", Email: "z@z.com", Roles: []model.Role{ru}}
 	u2 := model.User{ID: "lf2", Username: "beta", Email: "findme@y.com", Roles: []model.Role{ru}}
-	if err := db.Create(&u1).Error; err != nil {
+	err = db.Create(&u1).Error
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Create(&u2).Error; err != nil {
+	err = db.Create(&u2).Error
+	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := rs.AssignUserRole(ctx, &rolev1.AssignUserRoleRequest{UserId: u2.ID, RoleId: custom.Id}); err != nil {
+	if _, err = rs.AssignUserRole(ctx, &rolev1.AssignUserRoleRequest{UserId: u2.ID, RoleId: custom.Id}); err != nil {
 		t.Fatal(err)
 	}
 

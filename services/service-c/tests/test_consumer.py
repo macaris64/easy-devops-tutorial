@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from src.consumer import default_process_message, run_consumer
+from src.consumer import default_process_message, list_public_topics, run_consumer
 
 
 class _FakeMsg:
@@ -110,6 +110,30 @@ async def test_run_consumer_handler_error_continues(
 
 
 @pytest.mark.asyncio
+async def test_list_public_topics_excludes_internal_and_sorts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import src.consumer as consumer_mod
+
+    class _FakeAdmin:
+        def __init__(self, *_a: Any, **_kw: Any) -> None:
+            pass
+
+        async def start(self) -> None:
+            pass
+
+        async def close(self) -> None:
+            pass
+
+        async def list_topics(self) -> list[str]:
+            return ["__consumer_offsets", "zebra", "alpha"]
+
+    monkeypatch.setattr(consumer_mod, "AIOKafkaAdminClient", _FakeAdmin)
+    out = await list_public_topics(["localhost:9092"])
+    assert out == ["alpha", "zebra"]
+
+
+@pytest.mark.asyncio
 async def test_run_consumer_discovery_subscribes_to_topic_list(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -135,6 +159,62 @@ async def test_run_consumer_discovery_subscribes_to_topic_list(
     assert c is not None
     assert c.subscribed_topics == ["role.events", "user.events"]
     assert c.pattern is None
+
+
+@pytest.mark.asyncio
+async def test_run_consumer_discovery_failure_falls_back_to_pattern(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import src.consumer as consumer_mod
+
+    monkeypatch.setenv("KAFKA_BROKERS", "localhost:9092")
+    monkeypatch.setenv("KAFKA_TOPIC_PATTERN", r"events\..*")
+    monkeypatch.setenv("KAFKA_DISCOVER_ALL_TOPICS", "1")
+
+    async def boom(_brokers: list[str]) -> list[str]:
+        raise RuntimeError("kafka down")
+
+    monkeypatch.setattr(consumer_mod, "list_public_topics", boom)
+
+    c: _FakeConsumer | None = None
+
+    def factory(*a: Any, **kw: Any) -> _FakeConsumer:
+        nonlocal c
+        c = _FakeConsumer(*a, **kw)
+        return c
+
+    await run_consumer(consumer_factory=factory)
+    assert c is not None
+    assert c.subscribed_topics is None
+    assert c.pattern == r"events\..*"
+
+
+@pytest.mark.asyncio
+async def test_run_consumer_discovery_empty_uses_pattern(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import src.consumer as consumer_mod
+
+    monkeypatch.setenv("KAFKA_BROKERS", "localhost:9092")
+    monkeypatch.setenv("KAFKA_TOPIC_PATTERN", ".*")
+    monkeypatch.setenv("KAFKA_DISCOVER_ALL_TOPICS", "1")
+
+    async def empty(_brokers: list[str]) -> list[str]:
+        return []
+
+    monkeypatch.setattr(consumer_mod, "list_public_topics", empty)
+
+    c: _FakeConsumer | None = None
+
+    def factory(*a: Any, **kw: Any) -> _FakeConsumer:
+        nonlocal c
+        c = _FakeConsumer(*a, **kw)
+        return c
+
+    await run_consumer(consumer_factory=factory)
+    assert c is not None
+    assert c.subscribed_topics is None
+    assert c.pattern == ".*"
 
 
 @pytest.mark.asyncio
