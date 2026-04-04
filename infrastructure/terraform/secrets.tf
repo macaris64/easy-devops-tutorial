@@ -1,7 +1,9 @@
 # Gitignored fragment merged into project .env on the IaC path (see Makefile / CI).
 resource "local_sensitive_file" "terraform_env_fragment" {
-  filename = "${path.root}/../generated/terraform.env.fragment"
-  content  = <<-EOT
+  filename             = "${path.root}/../generated/terraform.env.fragment"
+  file_permission      = "0644"
+  directory_permission = "0755"
+  content              = <<-EOT
 # easy-devops terraform-managed secrets
 POSTGRES_PASSWORD=${var.postgres_password}
 JWT_SECRET=${var.jwt_secret}
