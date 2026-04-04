@@ -71,16 +71,19 @@ jobs:
           ansible-playbook -i inventory/hosts.yml playbooks/verify.yml --syntax-check
           ansible-playbook -i inventory/hosts.yml playbooks/site.yml --syntax-check
 
-      - name: Puppet apply (generate Kafka catalog)
-        run: make infra-puppet-apply
-
       - name: Terraform apply
         working-directory: infrastructure/terraform
         run: terraform apply -auto-approve
 
+      - name: Puppet apply (generate Kafka catalog)
+        run: make infra-puppet-apply
+
       - name: Prepare .env for Compose
         run: |
           cp .env.example .env
+          if [ -f infrastructure/generated/terraform.env.fragment ]; then
+            cat infrastructure/generated/terraform.env.fragment >> .env
+          fi
           cat infrastructure/generated/compose.env.fragment >> .env
 
       # Shared runner IPs hit Docker Hub anonymous limits when compose pulls many

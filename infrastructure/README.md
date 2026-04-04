@@ -2,13 +2,13 @@
 
 Tutorial-style operations (E2E checklist, Docker one-liners for tests) live in **[`docs/INFRASTRUCTURE.md`](../docs/INFRASTRUCTURE.md)**.
 
-This folder adds a **local Docker IaC path** alongside the existing **quickstart** (`docker compose up` only). The application graph stays in [`docker-compose.yml`](../docker-compose.yml) and [`docker-compose.infra.yml`](../docker-compose.infra.yml); Terraform owns **network + volumes**, Puppet owns **policy data and generated config**, Ansible owns **deployment, Kafka topics, and smoke checks**.
+This folder adds a **local Docker IaC path** alongside the existing **quickstart** (`docker compose up` only). The application graph stays in [`docker-compose.yml`](../docker-compose.yml) and [`docker-compose.infra.yml`](../docker-compose.infra.yml); Terraform owns **network + volumes + a generated secrets env fragment**, Puppet owns **policy data and generated config**, Ansible owns **deployment, Kafka topics, and smoke checks**.
 
 ## Roles
 
 | Tool | What it does |
 |------|----------------|
-| **Terraform** | Creates Docker **network** `app-network` and **named volumes** for Postgres and MongoDB. |
+| **Terraform** | Creates Docker **network** `app-network`, **named volumes** for Postgres and MongoDB, and `infrastructure/generated/terraform.env.fragment` (Compose secrets from variables / tfvars). |
 | **Puppet** | Renders `infrastructure/generated/kafka-topics.yaml` and `compose.env.fragment` from Hiera (run via Docker). |
 | **Ansible** | `docker compose` up (with or without IaC overlay), **Kafka topic** ensure from the catalog, **`GET /health`**. |
 
@@ -17,13 +17,15 @@ This folder adds a **local Docker IaC path** alongside the existing **quickstart
 ## IaC workflow (order matters)
 
 1. **Terraform** — from [`terraform/`](terraform/README.md): `terraform init && terraform apply`  
-   Do **not** run this if you plan to use plain `docker compose up` without the overlay on the same machine (network name collision). Destroy Terraform resources or use only one path.
+   Do **not** run this if you plan to use plain `docker compose up` without the overlay on the same machine (network name collision). Destroy Terraform resources or use only one path. Apply writes `infrastructure/generated/terraform.env.fragment`.
 
-2. **Puppet** — see [`puppet/README.md`](puppet/README.md) (Docker one-liner).
+2. **Environment (partial)** — copy [`.env.example`](../.env.example) to `.env` if needed, then append `infrastructure/generated/terraform.env.fragment` (secrets from Terraform; see [`terraform/README.md`](terraform/README.md)).
 
-3. **Environment** — copy [`.env.example`](../.env.example) to `.env`. Optionally append `infrastructure/generated/compose.env.fragment`.
+3. **Puppet** — see [`puppet/README.md`](puppet/README.md) (Docker one-liner).
 
-4. **Ansible** — see [`ansible/README.md`](ansible/README.md): `ansible-galaxy collection install -r requirements.yml` then `ansible-playbook playbooks/site.yml`.
+4. **Environment (finish)** — append `infrastructure/generated/compose.env.fragment` (volume names and Kafka topics).
+
+5. **Ansible** — see [`ansible/README.md`](ansible/README.md): `ansible-galaxy collection install -r requirements.yml` then `ansible-playbook playbooks/site.yml`.
 
 Compose files for this path:
 
@@ -57,13 +59,13 @@ From the repository root, `make help` lists targets. Common flows:
 | `make infra-terraform-*` | Init, fmt, validate, plan, apply, destroy |
 | `make infra-puppet-apply` | Render `infrastructure/generated/*` |
 | `make infra-ansible-install` then `make infra-ansible-site` | Full IaC deploy + topics + health |
-| `make infra-full-iac` | Terraform apply → Puppet → merge env fragment → Ansible site |
+| `make infra-full-iac` | Terraform apply → merge Terraform secrets fragment → Puppet → merge Puppet env fragment → Ansible site |
 
 Terraform runs via the `terraform` binary when installed; otherwise the Makefile uses the official `hashicorp/terraform:1.9` image (Docker socket required).
 
 ## GitHub Actions (simulation)
 
-Workflows run the same Terraform → Puppet → Ansible sequence on **`ubuntu-latest`**, using the runner’s Docker engine. There is **no cloud provider**; stacks are **destroyed at the end** so the job stays idempotent.
+Workflows run the same Terraform → Puppet → merge env fragments → Ansible sequence on **`ubuntu-latest`**, using the runner’s Docker engine. There is **no cloud provider**; stacks are **destroyed at the end** so the job stays idempotent.
 
 | Workflow | When | GitHub Environments |
 |----------|------|----------------------|

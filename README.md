@@ -39,9 +39,9 @@ After `docker compose up`, services publish to **localhost** unless you change t
 
 ## Infrastructure as Code (optional)
 
-Terraform provisions the Docker **network** and **named data volumes** used with [`docker-compose.iac.yml`](docker-compose.iac.yml). Puppet (containerized `puppet apply`) renders `infrastructure/generated/kafka-topics.yaml` and an optional `compose.env.fragment`. Ansible runs `docker compose`, applies **Kafka topics** from that catalog (`--if-not-exists`, same defaults as `kafka-init`), and checks `GET /health`.
+Terraform provisions the Docker **network** and **named data volumes** used with [`docker-compose.iac.yml`](docker-compose.iac.yml), and writes a **secrets** fragment under `infrastructure/generated/terraform.env.fragment` (from Terraform variables; see [`infrastructure/terraform/README.md`](infrastructure/terraform/README.md)). Puppet (containerized `puppet apply`) renders `infrastructure/generated/kafka-topics.yaml` and `compose.env.fragment`. Ansible runs `docker compose`, applies **Kafka topics** from that catalog (`--if-not-exists`, same defaults as `kafka-init`), and checks `GET /health`.
 
-**Order:** `terraform apply` → Puppet render → copy/merge `.env` → `ansible-playbook infrastructure/ansible/playbooks/site.yml`. Do **not** run Terraform on the same host if you rely on plain `docker compose up` without the overlay (both create `app-network`). Details: [infrastructure/README.md](infrastructure/README.md).
+**Order:** `terraform apply` → merge Terraform env fragment into `.env` → Puppet render → merge Puppet fragment → `ansible-playbook infrastructure/ansible/playbooks/site.yml`. Do **not** run Terraform on the same host if you rely on plain `docker compose up` without the overlay (both create `app-network`). Details: [infrastructure/README.md](infrastructure/README.md).
 
 ## Quick start
 

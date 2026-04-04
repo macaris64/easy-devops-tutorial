@@ -43,7 +43,7 @@ help:
 	@echo "  make run-logs        docker compose logs -f"
 	@echo "  make run-ps          docker compose ps"
 	@echo ""
-	@echo "IaC — Terraform (Docker network + volumes for docker-compose.iac.yml)"
+	@echo "IaC — Terraform (Docker network + volumes + secrets fragment for Compose)"
 	@echo "  make infra-terraform-init"
 	@echo "  make infra-terraform-fmt"
 	@echo "  make infra-terraform-validate"
@@ -65,7 +65,8 @@ help:
 	@echo ""
 	@echo "IaC — one-shot local sequence"
 	@echo "  make env-file            copy .env.example -> .env if missing"
-	@echo "  make infra-full-iac      terraform apply, puppet, ansible site (needs .env)"
+	@echo "  make infra-full-iac      terraform apply, merge env fragments, puppet, ansible site"
+	@echo "                           (optional: infrastructure/terraform/terraform.tfvars for secrets)"
 	@echo ""
 	@echo "Compose with IaC overlay (after terraform apply):"
 	@echo "  $(COMPOSE) -f docker-compose.yml -f docker-compose.iac.yml up --build -d"
@@ -142,7 +143,11 @@ env-file:
 	@test -f $(ROOT)/.env || cp $(ROOT)/.env.example $(ROOT)/.env
 	@echo "Using $(ROOT)/.env (created from .env.example if it was missing)."
 
-infra-full-iac: env-file infra-terraform-apply infra-puppet-apply
+infra-full-iac: env-file infra-terraform-apply
+	@if [ -f "$(ROOT)/infrastructure/generated/terraform.env.fragment" ] && ! grep -q '^# easy-devops terraform-managed secrets' "$(ROOT)/.env" 2>/dev/null; then \
+		cat "$(ROOT)/infrastructure/generated/terraform.env.fragment" >> "$(ROOT)/.env"; \
+	fi
+	@$(MAKE) infra-puppet-apply
 	@if ! grep -q '^POSTGRES_VOLUME_NAME=' "$(ROOT)/.env" 2>/dev/null; then \
 		cat "$(ROOT)/infrastructure/generated/compose.env.fragment" >> "$(ROOT)/.env"; \
 	fi

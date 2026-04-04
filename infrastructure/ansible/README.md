@@ -18,16 +18,17 @@ Deploys the monorepo stack with [`community.docker.docker_compose_v2`](https://d
 
 ## IaC path (Terraform overlay)
 
-1. `terraform -chdir=../terraform apply`
-2. Render generated files: see [`../puppet/README.md`](../puppet/README.md)
-3. From `infrastructure/ansible`:
+1. `terraform -chdir=../terraform apply` (writes `../generated/terraform.env.fragment`)
+2. Merge that fragment into `.env` after [`.env.example`](../../.env.example); see [`../terraform/README.md`](../terraform/README.md)
+3. Render Puppet outputs: see [`../puppet/README.md`](../puppet/README.md), then append `../generated/compose.env.fragment` to `.env`
+4. From `infrastructure/ansible`:
 
 ```bash
 ansible-galaxy collection install -r requirements.yml
 ansible-playbook playbooks/site.yml
 ```
 
-Use a project `.env` (copy from [`.env.example`](../../.env.example)) and optionally append `infrastructure/generated/compose.env.fragment` so volume names and Kafka topic names match Terraform/Puppet.
+Use a project `.env` (copy from [`.env.example`](../../.env.example)), append `infrastructure/generated/terraform.env.fragment` after Terraform apply, then `infrastructure/generated/compose.env.fragment` after Puppet so secrets and volume/topic names match the IaC outputs.
 
 ## Quickstart path (no Terraform)
 

@@ -25,6 +25,8 @@ This creates (gitignored except the folder stub):
 - `infrastructure/generated/kafka-topics.yaml` — topic catalog for [`../ansible/playbooks/kafka_topics.yml`](../ansible/playbooks/kafka_topics.yml)
 - `infrastructure/generated/compose.env.fragment` — optional lines to append to `.env` (volume names + `KAFKA_*` topic names)
 
+Terraform apply (before or after Puppet) writes `infrastructure/generated/terraform.env.fragment` for Compose secrets; see [`../terraform/README.md`](../terraform/README.md).
+
 ## Customizing
 
 Edit [`data/common.yaml`](data/common.yaml): `easy_devops::kafka_topics`, `easy_devops::kafka_user_events_topic`, `easy_devops::kafka_role_events_topic`, and volume name keys. Keep topic names aligned with **service-b** publishers and **service-c** consumers ([`.env.example`](../../.env.example), [docs/API.md](../../docs/API.md)).

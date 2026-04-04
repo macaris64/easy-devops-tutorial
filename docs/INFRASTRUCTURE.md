@@ -54,7 +54,7 @@ From the repo root:
 | Ansible collections | `make infra-ansible-install` |
 | Full IaC deploy + topics + health | `make infra-full-iac` (requires Docker; creates/uses `.env`) |
 
-**Order for IaC:** Terraform apply → Puppet apply → merge `infrastructure/generated/compose.env.fragment` into `.env` → Ansible `site` (or `make infra-full-iac`). Do **not** run Terraform on the same host where you already use plain `docker compose up` without the overlay unless you resolve the `app-network` name conflict (see [`infrastructure/terraform/README.md`](../infrastructure/terraform/README.md)).
+**Order for IaC:** `terraform apply` → append `infrastructure/generated/terraform.env.fragment` into `.env` (secrets; idempotent via marker comment) → Puppet apply → append `infrastructure/generated/compose.env.fragment` → Ansible `site` (or `make infra-full-iac`, which performs those steps). Secret values also live in **Terraform state**; keep state off Git and treat it as sensitive (see [`infrastructure/terraform/README.md`](../infrastructure/terraform/README.md)). Do **not** run Terraform on the same host where you already use plain `docker compose up` without the overlay unless you resolve the `app-network` name conflict.
 
 ---
 

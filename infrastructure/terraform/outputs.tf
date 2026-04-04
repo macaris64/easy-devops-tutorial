@@ -10,3 +10,8 @@ output "postgres_volume_name" {
 output "mongodb_volume_name" {
   value = docker_volume.mongodb.name
 }
+
+output "terraform_env_fragment_path" {
+  description = "Path to the generated Compose secrets fragment (relative to infrastructure/terraform/)"
+  value       = "../generated/terraform.env.fragment"
+}
