@@ -107,3 +107,45 @@ func TestRun_skipServe_sqlite(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestRun_skipServe_jwtFromEnv(t *testing.T) {
+	t.Setenv("POSTGRES_DSN", "ignored")
+	t.Setenv("KAFKA_BROKERS", "")
+	t.Setenv("GRPC_LISTEN_ADDR", "127.0.0.1:0")
+	t.Setenv("JWT_SECRET", "ci-secret")
+	t.Setenv("JWT_ACCESS_TTL_SECONDS", "42")
+	t.Setenv("JWT_REFRESH_TTL_HOURS", "3")
+	err := Run(&Options{
+		SkipServe: true,
+		OpenDB: func(string) (*gorm.DB, error) {
+			return gorm.Open(sqlite.Open("file:jwt_env?mode=memory"), &gorm.Config{})
+		},
+		Listen: func(network, address string) (net.Listener, error) {
+			return net.Listen(network, address)
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRun_skipServe_jwtTTLInvalidUsesDefaults(t *testing.T) {
+	t.Setenv("POSTGRES_DSN", "ignored")
+	t.Setenv("KAFKA_BROKERS", "")
+	t.Setenv("GRPC_LISTEN_ADDR", "127.0.0.1:0")
+	t.Setenv("JWT_SECRET", "")
+	t.Setenv("JWT_ACCESS_TTL_SECONDS", "not-int")
+	t.Setenv("JWT_REFRESH_TTL_HOURS", "also-bad")
+	err := Run(&Options{
+		SkipServe: true,
+		OpenDB: func(string) (*gorm.DB, error) {
+			return gorm.Open(sqlite.Open("file:jwt_bad?mode=memory"), &gorm.Config{})
+		},
+		Listen: func(network, address string) (net.Listener, error) {
+			return net.Listen(network, address)
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
