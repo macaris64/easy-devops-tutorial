@@ -17,6 +17,10 @@ services:
       JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret-change-me}
       BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME:-admin}
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-admin123}
+      # Idempotent demo account (non-admin), created on each service-b start if missing
+      SEED_DEMO_USERNAME: ${SEED_DEMO_USERNAME:-demo}
+      SEED_DEMO_PASSWORD: ${SEED_DEMO_PASSWORD:-demo123}
+      SEED_DEMO_EMAIL: ${SEED_DEMO_EMAIL:-demo@localhost}
       PASSWORD_RESET_DEV_RETURN_TOKEN: ${PASSWORD_RESET_DEV_RETURN_TOKEN:-0}
     ports:
       - "${SERVICE_B_GRPC_PORT:-50051}:50051"

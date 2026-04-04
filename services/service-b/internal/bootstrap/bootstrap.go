@@ -101,6 +101,9 @@ func Run(opts *Options) error {
 	if seedErr := seed.BootstrapAdmin(db); seedErr != nil {
 		return fmt.Errorf("bootstrap admin: %w", seedErr)
 	}
+	if seedErr := seed.EnsureDemoUser(db); seedErr != nil {
+		return fmt.Errorf("seed demo user: %w", seedErr)
+	}
 
 	var producer *kafkaprod.Producer
 	brokers := strings.Split(os.Getenv("KAFKA_BROKERS"), ",")

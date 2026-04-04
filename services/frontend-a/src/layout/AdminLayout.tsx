@@ -1,4 +1,3 @@
-import { ProfileSummary } from "@easy-devops/user-panel";
 import type { ReactElement, ReactNode } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
@@ -53,32 +52,36 @@ export function AdminLayout({ children }: AdminLayoutProps): ReactElement {
           >
             Kafka
           </NavLink>
+        </nav>
+        <nav
+          className="admin-header-account"
+          aria-label="Account"
+          data-testid="admin-profile"
+        >
+          {user ? (
+            <span className="admin-profile-user" data-testid="admin-profile-user">
+              {user.username}
+              <span className="admin-profile-email"> ({user.email})</span>
+            </span>
+          ) : null}
           <NavLink
             to="/me"
             className={({ isActive }) =>
               isActive ? "admin-nav-link active" : "admin-nav-link"
             }
           >
-            My account
+            Profile
           </NavLink>
-        </nav>
-        <div className="admin-profile" data-testid="admin-profile">
-          <ProfileSummary
-            user={
-              user
-                ? {
-                    username: user.username,
-                    email: user.email,
-                    roles: user.roles,
-                  }
-                : null
-            }
-            onLogout={() => {
+          <button
+            type="button"
+            className="admin-nav-link admin-nav-button"
+            onClick={() => {
               void logout();
             }}
-            emptyLabel=""
-          />
-        </div>
+          >
+            Log out
+          </button>
+        </nav>
       </header>
       <main className="admin-main">{children ?? <Outlet />}</main>
     </div>

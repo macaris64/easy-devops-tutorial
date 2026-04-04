@@ -74,3 +74,45 @@ func BootstrapAdmin(db *gorm.DB) error {
 	log.Printf("seed: bootstrap admin user %q created", u)
 	return nil
 }
+
+// EnsureDemoUser creates a non-admin user from env each time the process starts, if missing.
+// Set SEED_DEMO_USERNAME and SEED_DEMO_PASSWORD (both non-empty) to enable; leave either empty to skip.
+func EnsureDemoUser(db *gorm.DB) error {
+	u := os.Getenv("SEED_DEMO_USERNAME")
+	p := os.Getenv("SEED_DEMO_PASSWORD")
+	if u == "" || p == "" {
+		return nil
+	}
+	var existing model.User
+	err := db.Where("username = ?", u).First(&existing).Error
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+	hash, err := auth.HashPassword(p)
+	if err != nil {
+		return err
+	}
+	email := os.Getenv("SEED_DEMO_EMAIL")
+	if email == "" {
+		email = u + "@localhost"
+	}
+	user := model.User{
+		ID:           uuid.NewString(),
+		Username:     u,
+		Email:        email,
+		PasswordHash: hash,
+	}
+	var userRole model.Role
+	if err := db.Where("name = ?", model.RoleUser).First(&userRole).Error; err != nil {
+		return err
+	}
+	user.Roles = []model.Role{userRole}
+	if err := db.Create(&user).Error; err != nil {
+		return err
+	}
+	log.Printf("seed: demo user %q created (role %q only)", u, model.RoleUser)
+	return nil
+}

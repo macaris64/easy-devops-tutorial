@@ -61,7 +61,9 @@ After `docker compose up`, services publish to **localhost** unless you change t
      -d '{"username":"admin","password":"admin123"}'
    ```
 
-   Compose seeds a bootstrap admin when `BOOTSTRAP_ADMIN_USERNAME` / `BOOTSTRAP_ADMIN_PASSWORD` are set (defaults in `docker-compose.yml` match `.env.example`). Open [http://localhost:4173](http://localhost:4173), sign in at `/login`, then use **Users** (admin only) or **Look up user** by id.
+   On each **service-b** start, seeders ensure default accounts exist (idempotent — existing rows are left unchanged): **admin** (`BOOTSTRAP_ADMIN_*`, defaults `admin` / `admin123`) and **demo** (`SEED_DEMO_*`, defaults `demo` / `demo123`, non-admin). Open [http://localhost:4173](http://localhost:4173), sign in at [http://localhost:4173/login](http://localhost:4173/login), then use **Users** (admin only) or **Look up user** by id. Disable the demo user by setting `SEED_DEMO_USERNAME=` (empty) in `.env`.
+
+   **Troubleshooting (admin UI):** The shell stores JWTs in **browser localStorage** for `http://localhost:4173`. If `/` never shows a sign-in flow and [http://localhost:4173/login](http://localhost:4173/login) says you are already signed in (or you get sent straight to `/`), you still have a valid session—use **Continue to app** or **Sign out** on that page. To force a fresh login, clear site data for `localhost:4173` (DevTools → Application → Local Storage) or remove keys `easy_devops_access_token` and `easy_devops_refresh_token`. There is no public **register** page; use the seeded admin or create users via **Users** (admin) or the API.
 
 4. **Kafka UI**: [http://localhost:8080](http://localhost:8080) — inspect the `user.created` topic.
 
@@ -153,7 +155,8 @@ Configure hosts and secrets via `.env` / `.env.example` (databases, Kafka, gRPC)
 | `GRPC_HOST` / `GRPC_PORT` | Service-A → Service-B gRPC |
 | `USER_PROTO_ROOT` | Service-A: directory with `user/`, `auth/`, `role/` proto trees (Docker: `/app/protos`) |
 | `JWT_SECRET` | Service-B: HMAC key for access JWTs |
-| `BOOTSTRAP_ADMIN_USERNAME` / `BOOTSTRAP_ADMIN_PASSWORD` | Service-B: optional seed admin on migrate |
+| `BOOTSTRAP_ADMIN_USERNAME` / `BOOTSTRAP_ADMIN_PASSWORD` | Service-B: ensure admin user on each start (skip if username exists) |
+| `SEED_DEMO_USERNAME` / `SEED_DEMO_PASSWORD` / `SEED_DEMO_EMAIL` | Service-B: ensure non-admin demo user on each start (omit username or password to disable) |
 | `PASSWORD_RESET_DEV_RETURN_TOKEN` | Service-B: `1` to return reset token in JSON (dev only) |
 
 ## Bitnami images

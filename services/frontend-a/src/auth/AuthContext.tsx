@@ -8,7 +8,7 @@ import {
   useMemo,
   useState,
 } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { fetchMe, login as apiLogin, logout as apiLogout } from "../api/gateway";
 import { clearTokens, getAccessToken, setTokens } from "./authStorage";
 
@@ -26,11 +26,40 @@ const AuthContext = createContext<AuthState | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }): ReactElement {
   const navigate = useNavigate();
+  const location = useLocation();
   const [accessToken, setAccessToken] = useState<string | null>(() =>
     getAccessToken(),
   );
   const [user, setUser] = useState<CreatedUser | null>(null);
   const [loading, setLoading] = useState(true);
+
+  /** Re-read tokens from localStorage (fixes stale React state after DevTools clears storage). */
+  const resyncSessionFromStorage = useCallback(() => {
+    const t = getAccessToken();
+    setAccessToken((prev) => (prev === t ? prev : t));
+    if (!t) {
+      setUser(null);
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (location.pathname === "/login") {
+      resyncSessionFromStorage();
+    }
+  }, [location.pathname, resyncSessionFromStorage]);
+
+  useEffect(() => {
+    function onVisible(): void {
+      if (document.visibilityState === "visible") {
+        resyncSessionFromStorage();
+      }
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [resyncSessionFromStorage]);
 
   const refreshMe = useCallback(async () => {
     const t = getAccessToken();
