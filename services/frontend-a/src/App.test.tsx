@@ -83,4 +83,19 @@ describe("App", () => {
       expect(screen.getByRole("heading", { name: "Kafka" })).toBeInTheDocument();
     });
   });
+
+  it("renders my account route", async () => {
+    primeSession();
+    stubFetchWithMe(testAdminUser);
+    render(
+      <MemoryRouter initialEntries={["/me"]}>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "My account" })).toBeInTheDocument();
+    });
+  });
 });

@@ -15,3 +15,5 @@ export type { RoleBadgeListProps } from "./components/RoleBadgeList";
 export { RoleBadgeList } from "./components/RoleBadgeList";
 export type { RoleAssignmentFormProps } from "./components/RoleAssignmentForm";
 export { RoleAssignmentForm } from "./components/RoleAssignmentForm";
+export type { CurrentUserCardProps } from "./components/CurrentUserCard";
+export { CurrentUserCard } from "./components/CurrentUserCard";

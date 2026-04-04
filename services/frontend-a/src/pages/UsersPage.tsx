@@ -14,10 +14,10 @@ export function UsersPage(): ReactElement {
   const { isAdmin } = useAuth();
 
   return (
-    <section>
-      <h1>Users</h1>
+    <section className="users-page" data-testid="users-page" aria-labelledby="users-heading">
+      <h1 id="users-heading">Users</h1>
       {isAdmin ? (
-        <>
+        <div className="users-page-admin" data-testid="users-page-admin">
           <UserManagementPanel
             createUser={createUser}
             listUsers={listUsers}
@@ -26,14 +26,17 @@ export function UsersPage(): ReactElement {
             }
             deleteUser={(id: string) => apiDeleteUser(id).then(() => undefined)}
           />
-        </>
+          <UserLookupSection fetchUser={fetchUser} />
+        </div>
       ) : (
-        <p className="users-admin-only" data-testid="users-admin-only">
-          User management is restricted to administrators. You can still look up a
-          user by ID below.
-        </p>
+        <>
+          <p className="users-admin-only" data-testid="users-admin-only">
+            User management is restricted to administrators. You can still look up a
+            user by ID below.
+          </p>
+          <UserLookupSection fetchUser={fetchUser} />
+        </>
       )}
-      <UserLookupSection fetchUser={fetchUser} />
     </section>
   );
 }

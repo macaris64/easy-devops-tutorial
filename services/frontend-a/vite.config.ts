@@ -13,6 +13,10 @@ export default defineConfig({
         __dirname,
         "../frontend-c/src/index.ts",
       ),
+      "@easy-devops/log-panel": path.resolve(
+        __dirname,
+        "../frontend-b/src/index.ts",
+      ),
     },
   },
   server: {

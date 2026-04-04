@@ -52,6 +52,7 @@ describe("UsersPage", () => {
     await waitFor(() => {
       expect(screen.getByTestId("user-management-panel")).toBeInTheDocument();
     });
+    expect(screen.getByRole("heading", { name: "Look up user" })).toBeInTheDocument();
     await user.type(screen.getByLabelText(/username/i), "sam");
     await user.type(screen.getByLabelText(/email/i), "sam@example.com");
     await user.click(screen.getByRole("button", { name: /create user/i }));

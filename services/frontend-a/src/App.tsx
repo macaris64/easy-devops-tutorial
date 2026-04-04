@@ -6,6 +6,7 @@ import { HomePage } from "./pages/HomePage";
 import { KafkaPage } from "./pages/KafkaPage";
 import { LoginPage } from "./pages/LoginPage";
 import { LogsPage } from "./pages/LogsPage";
+import { MePage } from "./pages/MePage";
 import { UsersPage } from "./pages/UsersPage";
 
 export function App(): ReactElement {
@@ -24,6 +25,7 @@ export function App(): ReactElement {
         <Route path="users" element={<UsersPage />} />
         <Route path="logs" element={<LogsPage />} />
         <Route path="kafka" element={<KafkaPage />} />
+        <Route path="me" element={<MePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

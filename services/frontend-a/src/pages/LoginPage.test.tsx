@@ -84,7 +84,7 @@ describe("LoginPage", () => {
     await user.type(screen.getByLabelText(/password/i), "p");
     await user.click(screen.getByRole("button", { name: /log in/i }));
     await waitFor(() => {
-      expect(screen.getByTestId("login-error")).toHaveTextContent("bad");
+      expect(screen.getByTestId("login-form-error")).toHaveTextContent("bad");
     });
   });
 });
