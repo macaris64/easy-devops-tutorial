@@ -110,6 +110,13 @@ Changes flow **proto first**, then regenerate Go code; service-a’s build copie
 - **Service discovery** uses Docker DNS (`service-b`, `kafka`, `mongodb`, `postgres`, etc.).
 - **kafka-init** ensures topics exist before producers/consumers rely on them.
 - **Kafka** exposes an **internal** listener (`kafka:9092`) for containers and an **external** listener on the host (default `localhost:9094`) for host-side tools; see [README.md](../README.md).
+- **PostgreSQL and MongoDB** use Compose **named volumes** (`postgres_data`, `mongodb_data`). The optional IaC overlay [`docker-compose.iac.yml`](../docker-compose.iac.yml) attaches those volumes to **Terraform-managed** external names; see [infrastructure/README.md](../infrastructure/README.md).
+
+### Optional IaC layering (Terraform, Puppet, Ansible)
+
+- **Terraform** (`infrastructure/terraform`): creates Docker **network** `app-network` and **named volumes** for Postgres/Mongo data before Compose when using the overlay.
+- **Puppet** (`infrastructure/puppet`): Hiera-driven **topic catalog** and env fragments under `infrastructure/generated/` (apply via Dockerized `puppet-agent`).
+- **Ansible** (`infrastructure/ansible`): `docker compose` (with or without overlay), **Kafka topic** creation from the catalog (`kafka-topics.sh --if-not-exists`), and **HTTP health** checks. Compose remains the **canonical container graph**; IaC tools split primitives, policy/config, and orchestration.
 
 ```mermaid
 flowchart TB
@@ -153,7 +160,7 @@ services/
   frontend-b/    # Storybook (log UI components)
   frontend-c/    # Storybook (user UI components)
   common/protos/ # gRPC contracts
-infrastructure/  # Terraform, Ansible, Puppet (local cloud simulation)
+infrastructure/  # Terraform (Docker net/volumes), Puppet (generated catalog), Ansible (deploy + Kafka topics)
 ```
 
 ---

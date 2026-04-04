@@ -1,0 +1,11 @@
+---
+# Full IaC deploy: Compose → Kafka topics (idempotent) → smoke tests.
+# Prereqs: terraform apply, puppet apply (generated catalog), ansible-galaxy install -r requirements.yml
+- name: Phase — Compose
+  ansible.builtin.import_playbook: deploy.yml
+
+- name: Phase — Kafka topics
+  ansible.builtin.import_playbook: kafka_topics.yml
+
+- name: Phase — Verify
+  ansible.builtin.import_playbook: verify.yml

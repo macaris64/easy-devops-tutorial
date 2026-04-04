@@ -1,0 +1,38 @@
+---
+# Idempotent topic creation using the catalog from Puppet (infrastructure/generated/kafka-topics.yaml).
+# Requires Kafka healthy on app-network (Compose stack up).
+- name: Apply Kafka topics from catalog
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tags: [kafka, topics]
+  vars:
+    kafka_topics_catalog_file: "{{ playbook_dir | dirname | dirname | dirname }}/infrastructure/generated/kafka-topics.yaml"
+    kafka_toolbox_image: public.ecr.aws/bitnami/kafka:3.6
+  tasks:
+    - name: Load topic catalog
+      ansible.builtin.include_vars:
+        file: "{{ kafka_topics_catalog_file }}"
+
+    - name: Ensure each topic exists
+      ansible.builtin.command:
+        argv:
+          - docker
+          - run
+          - --rm
+          - --network
+          - app-network
+          - "{{ kafka_toolbox_image }}"
+          - /opt/bitnami/kafka/bin/kafka-topics.sh
+          - --create
+          - --if-not-exists
+          - --bootstrap-server
+          - kafka:9092
+          - --topic
+          - "{{ item.name }}"
+          - --partitions
+          - "{{ item.partitions | default(1) }}"
+          - --replication-factor
+          - "{{ item.replication_factor | default(1) }}"
+      loop: "{{ topics }}"
+      changed_when: false

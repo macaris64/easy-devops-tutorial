@@ -10,3 +10,10 @@ __pycache__/
 .venv/
 .env
 !.env.example
+
+# IaC
+**/.terraform/
+*.tfstate
+*.tfstate.*
+infrastructure/generated/*
+!infrastructure/generated/.gitignore

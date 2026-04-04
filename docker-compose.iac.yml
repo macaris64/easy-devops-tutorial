@@ -1,0 +1,18 @@
+# Overlay for Terraform-managed Docker resources.
+# Prerequisites: `terraform apply` in infrastructure/terraform/
+# Usage: docker compose -f docker-compose.yml -f docker-compose.iac.yml up --build -d
+#
+# Volume names default to Terraform outputs; override with POSTGRES_VOLUME_NAME / MONGODB_VOLUME_NAME in .env
+
+networks:
+  app-network:
+    external: true
+    name: app-network
+
+volumes:
+  postgres_data:
+    external: true
+    name: ${POSTGRES_VOLUME_NAME:-easy_devops_postgres_data}
+  mongodb_data:
+    external: true
+    name: ${MONGODB_VOLUME_NAME:-easy_devops_mongodb_data}
