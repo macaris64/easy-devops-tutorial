@@ -1,0 +1,97 @@
+# Simulated deploy on the GitHub runner’s Docker (no cloud).
+# Called from PR (development) and main (master) workflows.
+
+on:
+  workflow_call:
+    inputs:
+      environment_name:
+        description: Logical environment label shown in GitHub Deployments (development | master).
+        required: true
+        type: string
+
+concurrency:
+  group: infra-sim-${{ inputs.environment_name }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  terraform-ansible-puppet:
+    name: Simulate (${{ inputs.environment_name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    env:
+      ANSIBLE_COLLECTIONS_PATH: ${{ github.workspace }}/.ansible/collections
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Simulated deployment target
+        run: |
+          echo "DEPLOY_ENV=${{ inputs.environment_name }}"
+          echo "Running full stack on the runner Docker daemon (simulation only; resources destroyed at end)."
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Ansible Core
+        run: pip install "ansible-core>=2.14,<2.18"
+
+      - name: Install Ansible collections
+        run: ansible-galaxy collection install -r infrastructure/ansible/requirements.yml --collections-path "$ANSIBLE_COLLECTIONS_PATH"
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.0"
+          terraform_wrapper: false
+
+      - name: Terraform fmt
+        working-directory: infrastructure/terraform
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init
+        working-directory: infrastructure/terraform
+        run: terraform init
+
+      - name: Terraform validate
+        working-directory: infrastructure/terraform
+        run: terraform validate
+
+      - name: Puppet parser validate
+        run: make infra-puppet-validate
+
+      - name: Ansible syntax check
+        working-directory: infrastructure/ansible
+        run: |
+          ansible-playbook -i inventory/hosts.yml playbooks/deploy.yml --syntax-check
+          ansible-playbook -i inventory/hosts.yml playbooks/kafka_topics.yml --syntax-check
+          ansible-playbook -i inventory/hosts.yml playbooks/verify.yml --syntax-check
+          ansible-playbook -i inventory/hosts.yml playbooks/site.yml --syntax-check
+
+      - name: Puppet apply (generate Kafka catalog)
+        run: make infra-puppet-apply
+
+      - name: Terraform apply
+        working-directory: infrastructure/terraform
+        run: terraform apply -auto-approve
+
+      - name: Prepare .env for Compose
+        run: |
+          cp .env.example .env
+          cat infrastructure/generated/compose.env.fragment >> .env
+
+      - name: Ansible site (Compose, Kafka topics, health)
+        working-directory: infrastructure/ansible
+        run: ansible-playbook -i inventory/hosts.yml playbooks/site.yml
+
+      - name: Tear down Compose
+        if: always()
+        run: docker compose -f docker-compose.yml -f docker-compose.iac.yml down --remove-orphans || true
+
+      - name: Terraform destroy
+        if: always()
+        working-directory: infrastructure/terraform
+        run: terraform destroy -auto-approve || true

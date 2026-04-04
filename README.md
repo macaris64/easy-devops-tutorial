@@ -35,7 +35,7 @@ After `docker compose up`, services publish to **localhost** unless you change t
 
 - Docker and Docker Compose v2 (`docker compose`) with `include` support (Compose 2.20+ recommended).
 - Optional for local development: Go 1.22+, Node 20+, Python 3.11+.
-- Optional **IaC path**: Terraform, Ansible (with `community.docker`), and Puppet via Docker—see [infrastructure/README.md](infrastructure/README.md).
+- Optional **IaC path**: Terraform, Ansible (with `community.docker`), and Puppet via Docker—see [infrastructure/README.md](infrastructure/README.md). Run `make help` from the repo root for shortcuts.
 
 ## Infrastructure as Code (optional)
 

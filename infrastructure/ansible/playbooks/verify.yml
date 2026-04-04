@@ -13,3 +13,7 @@
         method: GET
         status_code: 200
         timeout: 30
+      register: service_a_health
+      until: service_a_health.status is defined and service_a_health.status == 200
+      retries: 36
+      delay: 10
