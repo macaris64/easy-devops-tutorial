@@ -1,5 +1,7 @@
 # Infrastructure (Terraform, Puppet, Ansible)
 
+Tutorial-style operations (E2E checklist, Docker one-liners for tests) live in **[`docs/INFRASTRUCTURE.md`](../docs/INFRASTRUCTURE.md)**.
+
 This folder adds a **local Docker IaC path** alongside the existing **quickstart** (`docker compose up` only). The application graph stays in [`docker-compose.yml`](../docker-compose.yml) and [`docker-compose.infra.yml`](../docker-compose.infra.yml); Terraform owns **network + volumes**, Puppet owns **policy data and generated config**, Ansible owns **deployment, Kafka topics, and smoke checks**.
 
 ## Roles

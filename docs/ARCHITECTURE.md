@@ -1,6 +1,6 @@
 # Architecture
 
-This document describes how the **easy-devops-tutorial** system is structured: runtime components, how they talk to each other, where state lives, and how contracts are shared. For standards and folder layout, see [OVERALL.md](OVERALL.md). For HTTP paths, gRPC services, and Kafka message shapes, see [API.md](API.md). For ports, quick start, and CI, see the [root README](../README.md).
+This document describes how the **easy-devops-tutorial** system is structured: runtime components, how they talk to each other, where state lives, and how contracts are shared. For standards and folder layout, see [OVERALL.md](OVERALL.md). For HTTP paths, gRPC services, and Kafka message shapes, see [API.md](API.md). For ports, quick start, and CI, see the [root README](../README.md). For IaC, Makefile, E2E checks, and quality commands, see [INFRASTRUCTURE.md](INFRASTRUCTURE.md).
 
 ---
 
@@ -169,4 +169,5 @@ infrastructure/  # Terraform (Docker net/volumes), Puppet (generated catalog), A
 
 - [OVERALL.md](OVERALL.md) — standards, roadmap, responsibility matrix.
 - [API.md](API.md) — REST, gRPC, Kafka, audit routes, error mapping.
+- [INFRASTRUCTURE.md](INFRASTRUCTURE.md) — IaC, Makefile, manual E2E, lint/test in Docker.
 - [README.md](../README.md) — ports table, env vars, CI, local commands.

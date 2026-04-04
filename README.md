@@ -2,7 +2,7 @@
 
 Polyglot microservices monorepo: **Service-A** (Node.js / Express + MongoDB), **Service-B** (Go / gRPC + PostgreSQL + Kafka), **Service-C** (Python / aiokafka). Shared contracts live in `services/common/protos` (`user`, `auth`, `role`).
 
-**API documentation:** [docs/API.md](docs/API.md) (REST gateway, JWT/RBAC, gRPC services, Kafka).
+**API documentation:** [docs/API.md](docs/API.md) (REST gateway, JWT/RBAC, gRPC services, Kafka). **Operations / IaC:** [docs/INFRASTRUCTURE.md](docs/INFRASTRUCTURE.md).
 
 ## Local URLs and ports
 
