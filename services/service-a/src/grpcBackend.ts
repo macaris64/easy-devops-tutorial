@@ -8,6 +8,17 @@ export type UserDTO = {
   roles: string[];
 };
 
+/** Optional filters for ListUsers gRPC (query string + role name). */
+export type ListUsersFilters = {
+  query?: string;
+  role?: string;
+};
+
+/** Optional filter for ListRoles gRPC (name substring). */
+export type ListRolesFilters = {
+  query?: string;
+};
+
 function grpcAddressFromEnv(): string {
   const grpcHost = process.env.GRPC_HOST || "localhost";
   const grpcPort = process.env.GRPC_PORT || "50051";
@@ -82,14 +93,14 @@ export interface GrpcBackend {
     email: string,
     password?: string,
   ): Promise<UserDTO>;
-  listUsers(authHeader: string | undefined): Promise<UserDTO[]>;
+  listUsers(authHeader: string | undefined, filters?: ListUsersFilters): Promise<UserDTO[]>;
   updateUser(
     authHeader: string | undefined,
     id: string,
     patch: { username?: string; email?: string; password?: string },
   ): Promise<UserDTO>;
   deleteUser(authHeader: string | undefined, id: string): Promise<UserDTO>;
-  listRoles(authHeader: string | undefined): Promise<{ id: string; name: string }[]>;
+  listRoles(authHeader: string | undefined, filters?: ListRolesFilters): Promise<{ id: string; name: string }[]>;
   createRole(authHeader: string | undefined, name: string): Promise<{ id: string; name: string }>;
   getRole(authHeader: string | undefined, id: string): Promise<{ id: string; name: string }>;
   updateRole(
@@ -181,8 +192,15 @@ export function buildGrpcBackend(
         userFromGrpc(r),
       );
     },
-    listUsers(authHeader) {
-      return promisifyMeta(meta(authHeader), (m, cb) => userClient.ListUsers({}, m, cb)).then((r) => {
+    listUsers(authHeader, filters) {
+      const req: Record<string, unknown> = {};
+      if (filters?.query !== undefined && filters.query.trim() !== "") {
+        req.query = filters.query.trim();
+      }
+      if (filters?.role !== undefined && filters.role.trim() !== "") {
+        req.role = filters.role.trim();
+      }
+      return promisifyMeta(meta(authHeader), (m, cb) => userClient.ListUsers(req, m, cb)).then((r) => {
         const users = (r as { users?: unknown[] }).users ?? [];
         return users.map((u) => userFromGrpc(u));
       });
@@ -207,8 +225,12 @@ export function buildGrpcBackend(
         userFromGrpc(r),
       );
     },
-    listRoles(authHeader) {
-      return promisifyMeta(meta(authHeader), (m, cb) => roleClient.ListRoles({}, m, cb)).then((r) => {
+    listRoles(authHeader, filters) {
+      const req: Record<string, unknown> = {};
+      if (filters?.query !== undefined && filters.query.trim() !== "") {
+        req.query = filters.query.trim();
+      }
+      return promisifyMeta(meta(authHeader), (m, cb) => roleClient.ListRoles(req, m, cb)).then((r) => {
         const roles = (r as { roles?: { id?: string; name?: string }[] }).roles ?? [];
         return roles.map((x) => ({ id: String(x.id ?? ""), name: String(x.name ?? "") }));
       });

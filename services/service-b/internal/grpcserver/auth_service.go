@@ -25,11 +25,11 @@ type AuthServer struct {
 	signer     *auth.JWTSigner
 	accessTTL  time.Duration
 	refreshTTL time.Duration
-	publisher  UserEventPublisher
+	publisher  DomainEventPublisher
 }
 
 // NewAuthServer constructs AuthServer.
-func NewAuthServer(db *gorm.DB, signer *auth.JWTSigner, accessTTL, refreshTTL time.Duration, pub UserEventPublisher) *AuthServer {
+func NewAuthServer(db *gorm.DB, signer *auth.JWTSigner, accessTTL, refreshTTL time.Duration, pub DomainEventPublisher) *AuthServer {
 	return &AuthServer{
 		db: db, signer: signer,
 		accessTTL: accessTTL, refreshTTL: refreshTTL, publisher: pub,
@@ -67,10 +67,9 @@ func (s *AuthServer) Register(ctx context.Context, req *authv1.RegisterRequest) 
 		return nil, status.Error(codes.Internal, "could not load user")
 	}
 	if s.publisher != nil {
-		if err := s.publisher.PublishUserCreated(ctx, u.ID, u.Username, u.Email); err != nil {
-			log.Printf("Kafka publish warning (user registered): %v", err)
-			if os.Getenv("KAFKA_STRICT") == "1" {
-				return nil, status.Error(codes.Internal, "failed to publish event")
+		if err := s.publisher.PublishUserCreated(ctx, u.ID, u.Username, u.Email, "registration"); err != nil {
+			if e := kafkaPublishError("Register", err); e != nil {
+				return nil, e
 			}
 		}
 	}
@@ -110,6 +109,13 @@ func (s *AuthServer) Login(ctx context.Context, req *authv1.LoginRequest) (*auth
 	if err := s.db.WithContext(ctx).Create(&rt).Error; err != nil {
 		return nil, status.Error(codes.Internal, "could not store refresh token")
 	}
+	if s.publisher != nil {
+		if err := s.publisher.PublishAuthLogin(ctx, u.ID, u.Username); err != nil {
+			if e := kafkaPublishError("Login", err); e != nil {
+				return nil, e
+			}
+		}
+	}
 	return &authv1.LoginResponse{
 		AccessToken:      access,
 		RefreshToken:     plain,
@@ -123,12 +129,20 @@ func (s *AuthServer) Logout(ctx context.Context, req *authv1.LogoutRequest) (*au
 	if req.GetRefreshToken() == "" {
 		return nil, status.Error(codes.InvalidArgument, "refresh_token is required")
 	}
-	if _, err := requireClaims(ctx); err != nil {
+	claims, err := requireClaims(ctx)
+	if err != nil {
 		return nil, err
 	}
 	h := auth.HashToken(req.GetRefreshToken())
 	if err := s.db.WithContext(ctx).Where("token_hash = ?", h).Delete(&model.RefreshToken{}).Error; err != nil {
 		return nil, status.Error(codes.Internal, "logout failed")
+	}
+	if s.publisher != nil {
+		if err := s.publisher.PublishAuthLogout(ctx, claims.UserID); err != nil {
+			if e := kafkaPublishError("Logout", err); e != nil {
+				return nil, e
+			}
+		}
 	}
 	return &authv1.LogoutResponse{}, nil
 }
@@ -176,6 +190,13 @@ func (s *AuthServer) ForgotPassword(ctx context.Context, req *authv1.ForgotPassw
 	if err := s.db.WithContext(ctx).Create(&pr).Error; err != nil {
 		return nil, status.Error(codes.Internal, "could not store reset token")
 	}
+	if s.publisher != nil {
+		if err := s.publisher.PublishAuthPasswordResetRequested(ctx, u.ID); err != nil {
+			if e := kafkaPublishError("ForgotPassword", err); e != nil {
+				return nil, e
+			}
+		}
+	}
 	resp := &authv1.ForgotPasswordResponse{Message: msg}
 	if os.Getenv("PASSWORD_RESET_DEV_RETURN_TOKEN") == "1" {
 		t := plain
@@ -205,5 +226,12 @@ func (s *AuthServer) ResetPassword(ctx context.Context, req *authv1.ResetPasswor
 		return nil, status.Error(codes.Internal, "could not update password")
 	}
 	_ = s.db.WithContext(ctx).Where("user_id = ?", pr.UserID).Delete(&model.PasswordResetToken{})
+	if s.publisher != nil {
+		if err := s.publisher.PublishAuthPasswordResetCompleted(ctx, pr.UserID); err != nil {
+			if e := kafkaPublishError("ResetPassword", err); e != nil {
+				return nil, e
+			}
+		}
+	}
 	return &authv1.ResetPasswordResponse{}, nil
 }

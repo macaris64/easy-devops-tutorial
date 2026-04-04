@@ -3,7 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../auth/AuthContext";
-import { authTestCleanup, stubFetchWithMe } from "../test/authTestUtils";
+import {
+  authTestCleanup,
+  primeSession,
+  stubFetchWithMe,
+} from "../test/authTestUtils";
 import { HomePage } from "./HomePage";
 import { LoginPage } from "./LoginPage";
 
@@ -61,6 +65,28 @@ describe("LoginPage", () => {
     });
   });
 
+  it("shows already signed in when tokens are in storage", async () => {
+    primeSession();
+    stubFetchWithMe({
+      id: "1",
+      username: "u",
+      email: "u@u.com",
+      roles: ["user"],
+    });
+    render(
+      <MemoryRouter initialEntries={["/login"]}>
+        <AuthProvider>
+          <LoginPage />
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId("login-already-signed-in")).toBeInTheDocument();
+    });
+    expect(screen.getByText(/signed in as/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /continue to app/i })).toBeInTheDocument();
+  });
+
   it("shows error on failed login", async () => {
     const user = userEvent.setup();
     vi.stubGlobal(
@@ -84,7 +110,7 @@ describe("LoginPage", () => {
     await user.type(screen.getByLabelText(/password/i), "p");
     await user.click(screen.getByRole("button", { name: /log in/i }));
     await waitFor(() => {
-      expect(screen.getByTestId("login-error")).toHaveTextContent("bad");
+      expect(screen.getByTestId("login-form-error")).toHaveTextContent("bad");
     });
   });
 });

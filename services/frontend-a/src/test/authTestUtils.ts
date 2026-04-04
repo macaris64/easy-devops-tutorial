@@ -77,3 +77,13 @@ export function isUsersListGet(url: string, init?: RequestInit): boolean {
   }
   return /\/users$/.test(path);
 }
+
+/** True for GET /.../roles (collection), not GET /.../roles/:id */
+export function isRolesListGet(url: string, init?: RequestInit): boolean {
+  const path = url.split("?")[0];
+  const method = init?.method ?? "GET";
+  if (method !== "GET") {
+    return false;
+  }
+  return /\/roles$/.test(path);
+}

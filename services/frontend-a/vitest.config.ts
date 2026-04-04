@@ -1,8 +1,24 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      "@easy-devops/user-panel": path.resolve(
+        __dirname,
+        "../frontend-c/src/index.ts",
+      ),
+      "@easy-devops/log-panel": path.resolve(
+        __dirname,
+        "../frontend-b/src/index.ts",
+      ),
+    },
+  },
   test: {
     environment: "jsdom",
     setupFiles: ["./vitest.setup.ts"],

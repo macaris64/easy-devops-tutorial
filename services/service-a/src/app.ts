@@ -3,7 +3,7 @@ import type { CorsOptions } from "cors";
 import express, { Request, Response } from "express";
 import * as grpc from "@grpc/grpc-js";
 import type { GrpcBackend } from "./grpcBackend";
-import { normalizeUserIdParam } from "./paramUtils";
+import { normalizeUserIdParam, pickQueryString } from "./paramUtils";
 
 export interface AuditLogRow {
   id: string;
@@ -14,6 +14,16 @@ export interface AuditLogRow {
   createdUserId?: string;
 }
 
+/** Query parameters for listing audit rows (Mongo-backed). */
+export interface AuditLogListQuery {
+  path?: string;
+  method?: string;
+  /** Substring match across path, method, payload JSON, created user id. */
+  q?: string;
+  /** Max rows (default 100, max 500). */
+  limit?: number;
+}
+
 export interface AppDeps {
   grpc: GrpcBackend;
   saveAuditLog: (entry: {
@@ -22,12 +32,46 @@ export interface AppDeps {
     payload: Record<string, unknown>;
     createdUserId?: string;
   }) => Promise<void>;
-  listAuditLogs: () => Promise<AuditLogRow[]>;
+  listAuditLogs: (query?: AuditLogListQuery) => Promise<AuditLogRow[]>;
+}
+
+type AuditEntry = Parameters<AppDeps["saveAuditLog"]>[0];
+
+/** Persists audit row; logs and swallows errors so upstream mutations still succeed. */
+async function saveAuditBestEffort(
+  deps: AppDeps,
+  entry: AuditEntry,
+): Promise<void> {
+  try {
+    await deps.saveAuditLog(entry);
+  } catch (e) {
+    console.error(
+      "audit log write failed:",
+      entry.method,
+      entry.path,
+      e,
+    );
+  }
 }
 
 function authHeader(req: Request): string | undefined {
   const h = req.headers.authorization;
   return typeof h === "string" && h.length > 0 ? h : undefined;
+}
+
+/** Field names present in a user PATCH body (never log password values). */
+function userPatchFieldNames(body: Record<string, unknown>): string[] {
+  const fields: string[] = [];
+  if (Object.prototype.hasOwnProperty.call(body, "username")) {
+    fields.push("username");
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "email")) {
+    fields.push("email");
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "password")) {
+    fields.push("password");
+  }
+  return fields;
 }
 
 export function mapGrpcError(e: unknown): { status: number; body: { error: string } } | null {
@@ -74,6 +118,16 @@ export function createApp(
         String(email),
         String(password),
       );
+      await saveAuditBestEffort(deps, {
+        path: "/auth/register",
+        method: "POST",
+        payload: {
+          kind: "auth",
+          action: "register",
+          userId: out.user.id,
+          username: out.user.username,
+        },
+      });
       res.status(201).json({ user: out.user });
     } catch (e: unknown) {
       const m = mapGrpcError(e);
@@ -90,6 +144,16 @@ export function createApp(
     const { username, password } = req.body ?? {};
     try {
       const out = await deps.grpc.login(String(username), String(password));
+      await saveAuditBestEffort(deps, {
+        path: "/auth/login",
+        method: "POST",
+        payload: {
+          kind: "auth",
+          action: "login",
+          userId: out.user.id,
+          username: out.user.username,
+        },
+      });
       res.json({
         accessToken: out.accessToken,
         refreshToken: out.refreshToken,
@@ -111,6 +175,11 @@ export function createApp(
     const { refreshToken } = req.body ?? {};
     try {
       await deps.grpc.logout(authHeader(req), String(refreshToken ?? ""));
+      await saveAuditBestEffort(deps, {
+        path: "/auth/logout",
+        method: "POST",
+        payload: { kind: "auth", action: "logout" },
+      });
       res.status(204).end();
     } catch (e: unknown) {
       const m = mapGrpcError(e);
@@ -125,6 +194,11 @@ export function createApp(
   app.get("/auth/me", async (req: Request, res: Response) => {
     try {
       const out = await deps.grpc.me(authHeader(req));
+      await saveAuditBestEffort(deps, {
+        path: "/auth/me",
+        method: "GET",
+        payload: { kind: "auth", action: "me", userId: out.user.id },
+      });
       res.json({ user: out.user });
     } catch (e: unknown) {
       const m = mapGrpcError(e);
@@ -140,6 +214,11 @@ export function createApp(
     const { email } = req.body ?? {};
     try {
       const out = await deps.grpc.forgotPassword(String(email ?? ""));
+      await saveAuditBestEffort(deps, {
+        path: "/auth/forgot-password",
+        method: "POST",
+        payload: { kind: "auth", action: "password_reset_requested" },
+      });
       const body: Record<string, unknown> = { message: out.message };
       if (out.resetToken !== undefined) {
         body.resetToken = out.resetToken;
@@ -159,6 +238,11 @@ export function createApp(
     const { token, newPassword } = req.body ?? {};
     try {
       await deps.grpc.resetPassword(String(token ?? ""), String(newPassword ?? ""));
+      await saveAuditBestEffort(deps, {
+        path: "/auth/reset-password",
+        method: "POST",
+        payload: { kind: "auth", action: "password_reset_completed" },
+      });
       res.status(204).end();
     } catch (e: unknown) {
       const m = mapGrpcError(e);
@@ -172,7 +256,21 @@ export function createApp(
 
   app.get("/users", async (req: Request, res: Response) => {
     try {
-      const users = await deps.grpc.listUsers(authHeader(req));
+      const q = pickQueryString(req.query.q);
+      const role = pickQueryString(req.query.role);
+      const users = await deps.grpc.listUsers(authHeader(req), {
+        query: q,
+        role,
+      });
+      await saveAuditBestEffort(deps, {
+        path: "/users",
+        method: "GET",
+        payload: {
+          kind: "user",
+          action: "list",
+          filters: { q: q ?? null, role: role ?? null },
+        },
+      });
       res.json(users);
     } catch (e: unknown) {
       const m = mapGrpcError(e);
@@ -192,6 +290,11 @@ export function createApp(
     }
     try {
       const user = await deps.grpc.getUser(authHeader(req), id);
+      await saveAuditBestEffort(deps, {
+        path: `/users/${id}`,
+        method: "GET",
+        payload: { kind: "user", action: "get", userId: id },
+      });
       res.json(user);
     } catch (e: unknown) {
       const mapped = mapGrpcError(e);
@@ -217,10 +320,16 @@ export function createApp(
         String(email),
         password === undefined || password === null ? undefined : String(password),
       );
-      await deps.saveAuditLog({
+      await saveAuditBestEffort(deps, {
         path: "/users",
         method: "POST",
-        payload: { username, email },
+        payload: {
+          kind: "user",
+          action: "create",
+          userId: created.id,
+          username,
+          email,
+        },
         createdUserId: created.id,
       });
       res.status(201).json(created);
@@ -241,12 +350,23 @@ export function createApp(
       res.status(400).json({ error: "id is required" });
       return;
     }
-    const { username, email, password } = req.body ?? {};
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const { username, email, password } = body;
     try {
       const u = await deps.grpc.updateUser(authHeader(req), id, {
         username: username === undefined ? undefined : String(username),
         email: email === undefined ? undefined : String(email),
         password: password === undefined ? undefined : String(password),
+      });
+      await saveAuditBestEffort(deps, {
+        path: `/users/${id}`,
+        method: "PATCH",
+        payload: {
+          kind: "user",
+          action: "update",
+          userId: id,
+          fields: userPatchFieldNames(body),
+        },
       });
       res.json(u);
     } catch (e: unknown) {
@@ -267,6 +387,11 @@ export function createApp(
     }
     try {
       const u = await deps.grpc.deleteUser(authHeader(req), id);
+      await saveAuditBestEffort(deps, {
+        path: `/users/${id}`,
+        method: "DELETE",
+        payload: { kind: "user", action: "delete", userId: id },
+      });
       res.json(u);
     } catch (e: unknown) {
       const m = mapGrpcError(e);
@@ -287,6 +412,16 @@ export function createApp(
     }
     try {
       await deps.grpc.assignUserRole(authHeader(req), id, String(roleId));
+      await saveAuditBestEffort(deps, {
+        path: `/users/${id}/roles`,
+        method: "POST",
+        payload: {
+          kind: "user_role",
+          action: "assign",
+          userId: id,
+          roleId: String(roleId),
+        },
+      });
       res.status(204).end();
     } catch (e: unknown) {
       const m = mapGrpcError(e);
@@ -307,6 +442,16 @@ export function createApp(
     }
     try {
       await deps.grpc.removeUserRole(authHeader(req), id, roleId);
+      await saveAuditBestEffort(deps, {
+        path: `/users/${id}/roles/${roleId}`,
+        method: "DELETE",
+        payload: {
+          kind: "user_role",
+          action: "remove",
+          userId: id,
+          roleId,
+        },
+      });
       res.status(204).end();
     } catch (e: unknown) {
       const m = mapGrpcError(e);
@@ -320,7 +465,13 @@ export function createApp(
 
   app.get("/roles", async (req: Request, res: Response) => {
     try {
-      const roles = await deps.grpc.listRoles(authHeader(req));
+      const q = pickQueryString(req.query.q);
+      const roles = await deps.grpc.listRoles(authHeader(req), { query: q });
+      await saveAuditBestEffort(deps, {
+        path: "/roles",
+        method: "GET",
+        payload: { kind: "role", action: "list", filters: { q: q ?? null } },
+      });
       res.json(roles);
     } catch (e: unknown) {
       const m = mapGrpcError(e);
@@ -340,6 +491,16 @@ export function createApp(
     }
     try {
       const r = await deps.grpc.createRole(authHeader(req), String(name));
+      await saveAuditBestEffort(deps, {
+        path: "/roles",
+        method: "POST",
+        payload: {
+          kind: "role",
+          action: "create",
+          roleId: r.id,
+          name: r.name,
+        },
+      });
       res.status(201).json(r);
     } catch (e: unknown) {
       const m = mapGrpcError(e);
@@ -359,6 +520,11 @@ export function createApp(
     }
     try {
       const r = await deps.grpc.getRole(authHeader(req), id);
+      await saveAuditBestEffort(deps, {
+        path: `/roles/${id}`,
+        method: "GET",
+        payload: { kind: "role", action: "get", roleId: id },
+      });
       res.json(r);
     } catch (e: unknown) {
       const m = mapGrpcError(e);
@@ -379,6 +545,16 @@ export function createApp(
     }
     try {
       const r = await deps.grpc.updateRole(authHeader(req), id, String(name));
+      await saveAuditBestEffort(deps, {
+        path: `/roles/${id}`,
+        method: "PATCH",
+        payload: {
+          kind: "role",
+          action: "update",
+          roleId: id,
+          name: r.name,
+        },
+      });
       res.json(r);
     } catch (e: unknown) {
       const m = mapGrpcError(e);
@@ -398,6 +574,16 @@ export function createApp(
     }
     try {
       const r = await deps.grpc.deleteRole(authHeader(req), id);
+      await saveAuditBestEffort(deps, {
+        path: `/roles/${id}`,
+        method: "DELETE",
+        payload: {
+          kind: "role",
+          action: "delete",
+          roleId: id,
+          name: r.name,
+        },
+      });
       res.json(r);
     } catch (e: unknown) {
       const m = mapGrpcError(e);
@@ -409,11 +595,43 @@ export function createApp(
     }
   });
 
-  app.get("/audit-logs", async (_req: Request, res: Response) => {
+  app.get("/audit-logs", async (req: Request, res: Response) => {
+    const auth = authHeader(req);
+    if (!auth) {
+      res.status(401).json({ error: "authentication required" });
+      return;
+    }
     try {
-      const rows = await deps.listAuditLogs();
+      const { user } = await deps.grpc.me(auth);
+      if (!user.roles?.includes("admin")) {
+        res.status(403).json({ error: "admin access required" });
+        return;
+      }
+      const pathF = pickQueryString(req.query.path);
+      const methodF = pickQueryString(req.query.method);
+      const q = pickQueryString(req.query.q);
+      let limit = 100;
+      const limRaw = req.query.limit;
+      if (typeof limRaw === "string" && limRaw.trim() !== "") {
+        const n = Number.parseInt(limRaw, 10);
+        if (!Number.isNaN(n)) {
+          limit = n;
+        }
+      }
+      limit = Math.min(500, Math.max(1, limit));
+      const rows = await deps.listAuditLogs({
+        path: pathF,
+        method: methodF,
+        q,
+        limit,
+      });
       res.json(rows);
-    } catch (e) {
+    } catch (e: unknown) {
+      const m = mapGrpcError(e);
+      if (m) {
+        res.status(m.status).json(m.body);
+        return;
+      }
       console.error("GET /audit-logs error:", e);
       res.status(500).json({ error: "failed to load audit logs" });
     }

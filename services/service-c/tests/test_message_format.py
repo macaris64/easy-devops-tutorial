@@ -18,6 +18,20 @@ def test_format_message_value_json() -> None:
     assert json.loads(out) == {"x": 1}
 
 
+def test_format_message_value_domain_event_payload() -> None:
+    """Service-B domain events: aggregate event, data action, timestamp + ids."""
+    raw = (
+        b'{"event":"user","data":"user.role_assigned","user_id":"u1","role_id":"r2",'
+        b'"timestamp":"2026-04-04T12:00:00.000Z"}'
+    )
+    out = format_message_value(raw)
+    parsed = json.loads(out)
+    assert parsed["event"] == "user"
+    assert parsed["data"] == "user.role_assigned"
+    assert parsed["user_id"] == "u1"
+    assert parsed["role_id"] == "r2"
+
+
 def test_format_message_value_plain_text() -> None:
     assert format_message_value(b"not-json") == "not-json"
 

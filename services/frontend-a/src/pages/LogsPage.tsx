@@ -25,7 +25,7 @@ export function LogsPage(): ReactElement {
   }, [load]);
 
   return (
-    <section>
+    <section className="page-section">
       <h1>Audit logs</h1>
       {error ? (
         <p className="form-error" role="alert" data-testid="logs-error">

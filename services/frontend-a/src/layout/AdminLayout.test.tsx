@@ -41,7 +41,8 @@ describe("AdminLayout", () => {
       expect(screen.getByText("users page")).toBeInTheDocument();
     });
     const usersLink = screen.getByRole("link", { name: "Users" });
-    expect(usersLink).toHaveClass("active");
+    expect(usersLink).toHaveClass("admin-tab-active");
+    expect(screen.getByRole("link", { name: "Roles" })).toBeInTheDocument();
     expect(screen.getByTestId("admin-profile")).toHaveTextContent("admin");
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "Log out" }));
@@ -74,5 +75,6 @@ describe("AdminLayout", () => {
       expect(screen.getByText("home")).toBeInTheDocument();
     });
     expect(screen.queryByRole("link", { name: "Users" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Roles" })).toBeNull();
   });
 });

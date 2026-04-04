@@ -12,7 +12,7 @@
       "import": "./dist/index.js"
     }
   },
-  "sideEffects": false,
+  "sideEffects": ["**/*.css"],
   "scripts": {
     "build": "vite build",
     "test": "vitest run",

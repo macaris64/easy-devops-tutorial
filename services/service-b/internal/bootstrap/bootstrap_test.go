@@ -74,7 +74,8 @@ func TestRun_listenError(t *testing.T) {
 func TestRun_skipServe_withKafkaBrokers(t *testing.T) {
 	t.Setenv("POSTGRES_DSN", "ignored")
 	t.Setenv("KAFKA_BROKERS", "127.0.0.1:59092")
-	t.Setenv("USER_CREATED_TOPIC", "user.created")
+	t.Setenv("KAFKA_USER_EVENTS_TOPIC", "user.events")
+	t.Setenv("KAFKA_ROLE_EVENTS_TOPIC", "role.events")
 	t.Setenv("GRPC_LISTEN_ADDR", "127.0.0.1:0")
 	err := Run(&Options{
 		SkipServe: true,

@@ -12,3 +12,17 @@ export interface RoleOption {
   id: string;
   name: string;
 }
+
+/** Alias for role rows in admin CRUD (same as RoleOption). */
+export type RoleRecord = RoleOption;
+
+/** Server-side filters for `GET /users` (gateway). */
+export type UserListFilters = {
+  query?: string;
+  role?: string;
+};
+
+/** Server-side filters for `GET /roles` (gateway). */
+export type RoleListFilters = {
+  query?: string;
+};

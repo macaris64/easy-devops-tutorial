@@ -7,6 +7,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	rolev1 "easy-devops-tutorial/service-b/internal/genpb/role/v1"
 	userv1 "easy-devops-tutorial/service-b/internal/genpb/user/v1"
 	"easy-devops-tutorial/service-b/internal/grpcauth"
 	"easy-devops-tutorial/service-b/internal/model"
@@ -50,6 +51,54 @@ func TestUserServer_nonAdminDenied(t *testing.T) {
 	_, err := s.ListUsers(ctx, &userv1.ListUsersRequest{})
 	if status.Code(err) != codes.PermissionDenied {
 		t.Fatalf("%v", err)
+	}
+}
+
+func TestUserServer_ListUsers_queryAndRoleFilter(t *testing.T) {
+	db := openTestDB(t, "_listf")
+	s := NewUserServer(db, nil)
+	rs := NewRoleServer(db, nil)
+	ctx := adminClaimsCtx(t, db)
+
+	custom, err := rs.CreateRole(ctx, &rolev1.CreateRoleRequest{Name: "filtertest_role"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ru model.Role
+	err = db.Where("name = ?", model.RoleUser).First(&ru).Error
+	if err != nil {
+		t.Fatal(err)
+	}
+	u1 := model.User{ID: "lf1", Username: "alpha_search", Email: "z@z.com", Roles: []model.Role{ru}}
+	u2 := model.User{ID: "lf2", Username: "beta", Email: "findme@y.com", Roles: []model.Role{ru}}
+	err = db.Create(&u1).Error
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = db.Create(&u2).Error
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = rs.AssignUserRole(ctx, &rolev1.AssignUserRoleRequest{UserId: u2.ID, RoleId: custom.Id}); err != nil {
+		t.Fatal(err)
+	}
+
+	q := "findme"
+	list, err := s.ListUsers(ctx, &userv1.ListUsersRequest{Query: &q})
+	if err != nil || len(list.Users) != 1 || list.Users[0].Id != u2.ID {
+		t.Fatalf("query: %v %+v", err, list)
+	}
+
+	roleName := "filtertest_role"
+	list2, err := s.ListUsers(ctx, &userv1.ListUsersRequest{Role: &roleName})
+	if err != nil || len(list2.Users) != 1 || list2.Users[0].Id != u2.ID {
+		t.Fatalf("role: %v %+v", err, list2)
+	}
+
+	comboQ := "beta"
+	list3, err := s.ListUsers(ctx, &userv1.ListUsersRequest{Query: &comboQ, Role: &roleName})
+	if err != nil || len(list3.Users) != 1 {
+		t.Fatalf("combo: %v %+v", err, list3)
 	}
 }
 

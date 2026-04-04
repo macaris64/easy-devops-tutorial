@@ -19,7 +19,38 @@ import (
 
 type errPublisher struct{}
 
-func (errPublisher) PublishUserCreated(context.Context, string, string, string) error {
+func (errPublisher) PublishUserCreated(context.Context, string, string, string, string) error {
+	return errors.New("kafka down")
+}
+func (errPublisher) PublishUserUpdated(context.Context, string, string, string) error {
+	return errors.New("kafka down")
+}
+func (errPublisher) PublishUserDeleted(context.Context, string, string, string) error {
+	return errors.New("kafka down")
+}
+func (errPublisher) PublishAuthLogin(context.Context, string, string) error {
+	return errors.New("kafka down")
+}
+func (errPublisher) PublishAuthLogout(context.Context, string) error { return errors.New("kafka down") }
+func (errPublisher) PublishAuthPasswordResetRequested(context.Context, string) error {
+	return errors.New("kafka down")
+}
+func (errPublisher) PublishAuthPasswordResetCompleted(context.Context, string) error {
+	return errors.New("kafka down")
+}
+func (errPublisher) PublishRoleCreated(context.Context, string, string) error {
+	return errors.New("kafka down")
+}
+func (errPublisher) PublishRoleUpdated(context.Context, string, string) error {
+	return errors.New("kafka down")
+}
+func (errPublisher) PublishRoleDeleted(context.Context, string, string) error {
+	return errors.New("kafka down")
+}
+func (errPublisher) PublishUserRoleAssigned(context.Context, string, string) error {
+	return errors.New("kafka down")
+}
+func (errPublisher) PublishUserRoleRemoved(context.Context, string, string) error {
 	return errors.New("kafka down")
 }
 
@@ -215,7 +246,7 @@ func TestUserServer_UpdateUser_emailPassword(t *testing.T) {
 
 func TestRoleServer_CreateGet_validation(t *testing.T) {
 	db := openTestDB(t, "_edgerl")
-	rs := NewRoleServer(db)
+	rs := NewRoleServer(db, nil)
 	ctx := adminClaimsCtx(t, db)
 	_, err := rs.CreateRole(ctx, &rolev1.CreateRoleRequest{Name: "  "})
 	if status.Code(err) != codes.InvalidArgument {
@@ -245,7 +276,7 @@ func TestRoleServer_CreateGet_validation(t *testing.T) {
 
 func TestRoleServer_UpdateDelete_notFoundAndDup(t *testing.T) {
 	db := openTestDB(t, "_edger2")
-	rs := NewRoleServer(db)
+	rs := NewRoleServer(db, nil)
 	ctx := adminClaimsCtx(t, db)
 	a, err := rs.CreateRole(ctx, &rolev1.CreateRoleRequest{Name: "ra"})
 	if err != nil {
@@ -271,7 +302,7 @@ func TestRoleServer_UpdateDelete_notFoundAndDup(t *testing.T) {
 
 func TestRoleServer_AssignRemove_notFound(t *testing.T) {
 	db := openTestDB(t, "_edger3")
-	rs := NewRoleServer(db)
+	rs := NewRoleServer(db, nil)
 	ctx := adminClaimsCtx(t, db)
 	r, err := rs.CreateRole(ctx, &rolev1.CreateRoleRequest{Name: "rassign"})
 	if err != nil {
@@ -297,7 +328,7 @@ func TestRoleServer_AssignRemove_notFound(t *testing.T) {
 
 func TestRoleServer_ListRoles_nonAdmin(t *testing.T) {
 	db := openTestDB(t, "_edger4")
-	rs := NewRoleServer(db)
+	rs := NewRoleServer(db, nil)
 	var ru model.Role
 	_ = db.Where("name = ?", model.RoleUser).First(&ru).Error
 	u := model.User{ID: "plain2", Username: "p2", Email: "p2@p", Roles: []model.Role{ru}}

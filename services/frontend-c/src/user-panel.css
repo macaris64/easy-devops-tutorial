@@ -1,0 +1,219 @@
+/* User / role admin panels */
+
+:root {
+  --u-panel-surface: #ffffff;
+  --u-panel-border: #e2e8f0;
+  --u-panel-muted: #64748b;
+  --u-panel-text: #0f172a;
+  --u-panel-accent: #2563eb;
+  --u-panel-radius: 10px;
+  --u-panel-radius-sm: 6px;
+  --u-panel-shadow: 0 1px 3px rgb(15 23 42 / 0.08);
+}
+
+.user-management-panel {
+  background: var(--u-panel-surface);
+  border: 1px solid var(--u-panel-border);
+  border-radius: var(--u-panel-radius);
+  box-shadow: var(--u-panel-shadow);
+  padding: 1.25rem 1.5rem;
+  max-width: 56rem;
+}
+
+.user-management-panel > h2 {
+  margin: 0 0 1rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--u-panel-text);
+}
+
+.user-create-form,
+.role-create-form {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  padding: 1rem;
+  background: #f8fafc;
+  border: 1px solid var(--u-panel-border);
+  border-radius: var(--u-panel-radius-sm);
+}
+
+.user-create-form .field,
+.role-create-form .field {
+  margin: 0;
+}
+
+.user-create-form label,
+.role-create-form label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--u-panel-muted);
+  margin-bottom: 0.35rem;
+}
+
+.user-create-form input,
+.role-create-form input,
+.user-panel-toolbar input,
+.user-panel-toolbar select {
+  width: 100%;
+  max-width: 22rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--u-panel-border);
+  border-radius: var(--u-panel-radius-sm);
+  font: inherit;
+  color: var(--u-panel-text);
+  background: #fff;
+}
+
+.user-create-form input:focus,
+.role-create-form input:focus,
+.user-panel-toolbar input:focus,
+.user-panel-toolbar select:focus {
+  outline: 2px solid var(--u-panel-accent);
+  outline-offset: 1px;
+  border-color: var(--u-panel-accent);
+}
+
+.user-create-form button[type="submit"],
+.role-create-form button[type="submit"],
+.user-panel-toolbar button {
+  justify-self: start;
+  padding: 0.5rem 1rem;
+  border-radius: var(--u-panel-radius-sm);
+  border: none;
+  background: var(--u-panel-accent);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.user-create-form button[type="submit"]:disabled,
+.role-create-form button[type="submit"]:disabled,
+.user-panel-toolbar button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.user-panel-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.65rem 1rem;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--u-panel-border);
+}
+
+.user-panel-toolbar label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--u-panel-muted);
+}
+
+.user-panel-toolbar .user-panel-toolbar-actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.user-management-list > h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.user-list-table,
+.role-list-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.user-list-table th,
+.user-list-table td,
+.role-list-table th,
+.role-list-table td {
+  border-bottom: 1px solid var(--u-panel-border);
+  padding: 0.55rem 0.65rem;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.user-list-table thead th,
+.role-list-table thead th {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--u-panel-muted);
+  background: #f8fafc;
+}
+
+.user-list-table tbody tr:hover,
+.role-list-table tbody tr:hover {
+  background: rgb(37 99 235 / 0.04);
+}
+
+.user-list-table button,
+.role-list-table button {
+  margin-right: 0.35rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8125rem;
+  border-radius: 4px;
+  border: 1px solid var(--u-panel-border);
+  background: #fff;
+  cursor: pointer;
+}
+
+.user-list-table button:hover:not(:disabled),
+.role-list-table button:hover:not(:disabled) {
+  background: #f1f5f9;
+}
+
+.user-list-roles-cell select {
+  max-width: 10rem;
+  margin-right: 0.35rem;
+  padding: 0.25rem 0.35rem;
+  border-radius: 4px;
+  border: 1px solid var(--u-panel-border);
+}
+
+.form-error {
+  color: #b91c1c;
+  font-size: 0.875rem;
+  margin: 0.25rem 0;
+}
+
+.user-summary-empty {
+  margin: 0.75rem 0;
+  font-size: 0.875rem;
+  color: var(--u-panel-muted);
+}
+
+.user-summary {
+  margin: 1rem 0;
+  padding: 0.85rem 1rem;
+  border-radius: var(--u-panel-radius-sm);
+  border: 1px solid var(--u-panel-border);
+  background: #f0fdf4;
+  font-size: 0.875rem;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.35rem 1rem;
+}
+
+.user-summary dt {
+  font-weight: 600;
+  color: var(--u-panel-muted);
+}
+
+.user-summary dd {
+  margin: 0;
+}

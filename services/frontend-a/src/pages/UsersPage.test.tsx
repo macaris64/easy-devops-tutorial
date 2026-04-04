@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { AuthProvider } from "../auth/AuthContext";
 import {
   authTestCleanup,
+  isRolesListGet,
   isUsersListGet,
   primeSession,
   stubFetchWithMe,
@@ -22,6 +23,12 @@ describe("UsersPage", () => {
     primeSession();
     stubFetchWithMe(testAdminUser, (url, init) => {
       if (isUsersListGet(url, init)) {
+        return {
+          ok: true,
+          json: () => Promise.resolve([]),
+        } as Response;
+      }
+      if (isRolesListGet(url, init)) {
         return {
           ok: true,
           json: () => Promise.resolve([]),
@@ -52,6 +59,7 @@ describe("UsersPage", () => {
     await waitFor(() => {
       expect(screen.getByTestId("user-management-panel")).toBeInTheDocument();
     });
+    expect(screen.getByRole("heading", { name: "Look up user" })).toBeInTheDocument();
     await user.type(screen.getByLabelText(/username/i), "sam");
     await user.type(screen.getByLabelText(/email/i), "sam@example.com");
     await user.click(screen.getByRole("button", { name: /create user/i }));

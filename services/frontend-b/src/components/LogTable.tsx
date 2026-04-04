@@ -30,7 +30,8 @@ export function LogTable({
             <th>Time</th>
             <th>Method</th>
             <th>Path</th>
-            <th>User ID</th>
+            <th>Created user ID</th>
+            <th>Payload</th>
           </tr>
         </thead>
         <tbody>

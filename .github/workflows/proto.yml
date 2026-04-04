@@ -32,4 +32,4 @@ jobs:
         if: github.event_name == 'pull_request'
         run: >
           buf breaking
-          --against "${GITHUB_WORKSPACE}/.git#branch=${{ github.event.pull_request.base.ref }},subdir=services/common"
+          --against "${GITHUB_WORKSPACE}/.git#ref=${{ github.event.pull_request.base.sha }},subdir=services/common"

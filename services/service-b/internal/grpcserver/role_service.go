@@ -17,12 +17,13 @@ import (
 // RoleServer implements role.v1.RoleService.
 type RoleServer struct {
 	rolev1.UnimplementedRoleServiceServer
-	db *gorm.DB
+	db        *gorm.DB
+	publisher DomainEventPublisher
 }
 
 // NewRoleServer constructs RoleServer.
-func NewRoleServer(db *gorm.DB) *RoleServer {
-	return &RoleServer{db: db}
+func NewRoleServer(db *gorm.DB, publisher DomainEventPublisher) *RoleServer {
+	return &RoleServer{db: db, publisher: publisher}
 }
 
 func (s *RoleServer) admin(ctx context.Context) error {
@@ -47,6 +48,13 @@ func (s *RoleServer) CreateRole(ctx context.Context, req *rolev1.CreateRoleReque
 			return nil, status.Error(codes.AlreadyExists, "role name exists")
 		}
 		return nil, status.Error(codes.Internal, "could not create role")
+	}
+	if s.publisher != nil {
+		if err := s.publisher.PublishRoleCreated(ctx, r.ID, r.Name); err != nil {
+			if e := kafkaPublishError("CreateRole", err); e != nil {
+				return nil, e
+			}
+		}
 	}
 	return roleToPB(&r), nil
 }
@@ -91,6 +99,13 @@ func (s *RoleServer) UpdateRole(ctx context.Context, req *rolev1.UpdateRoleReque
 		}
 		return nil, status.Error(codes.Internal, "could not update role")
 	}
+	if s.publisher != nil {
+		if err := s.publisher.PublishRoleUpdated(ctx, r.ID, r.Name); err != nil {
+			if e := kafkaPublishError("UpdateRole", err); e != nil {
+				return nil, e
+			}
+		}
+	}
 	return roleToPB(&r), nil
 }
 
@@ -113,16 +128,27 @@ func (s *RoleServer) DeleteRole(ctx context.Context, req *rolev1.DeleteRoleReque
 	if err := s.db.WithContext(ctx).Delete(&model.Role{}, "id = ?", req.GetId()).Error; err != nil {
 		return nil, status.Error(codes.Internal, "could not delete role")
 	}
+	if s.publisher != nil {
+		if err := s.publisher.PublishRoleDeleted(ctx, r.ID, r.Name); err != nil {
+			if e := kafkaPublishError("DeleteRole", err); e != nil {
+				return nil, e
+			}
+		}
+	}
 	return pb, nil
 }
 
-// ListRoles returns all roles (admin).
-func (s *RoleServer) ListRoles(ctx context.Context, _ *rolev1.ListRolesRequest) (*rolev1.ListRolesResponse, error) {
+// ListRoles returns all roles (admin), optionally filtered by name substring.
+func (s *RoleServer) ListRoles(ctx context.Context, req *rolev1.ListRolesRequest) (*rolev1.ListRolesResponse, error) {
 	if err := s.admin(ctx); err != nil {
 		return nil, err
 	}
+	tx := s.db.WithContext(ctx).Model(&model.Role{})
+	if pat, ok := likeSubstringPattern(req.GetQuery()); ok {
+		tx = tx.Where("LOWER(roles.name) LIKE ?", pat)
+	}
 	var roles []model.Role
-	if err := s.db.WithContext(ctx).Order("name").Find(&roles).Error; err != nil {
+	if err := tx.Order("roles.name").Find(&roles).Error; err != nil {
 		return nil, status.Error(codes.Internal, "database error")
 	}
 	out := make([]*rolev1.Role, 0, len(roles))
@@ -157,6 +183,13 @@ func (s *RoleServer) AssignUserRole(ctx context.Context, req *rolev1.AssignUserR
 	if err := s.db.WithContext(ctx).Model(&u).Association("Roles").Append(&r); err != nil {
 		return nil, status.Error(codes.Internal, "could not assign role")
 	}
+	if s.publisher != nil {
+		if err := s.publisher.PublishUserRoleAssigned(ctx, u.ID, r.ID); err != nil {
+			if e := kafkaPublishError("AssignUserRole", err); e != nil {
+				return nil, e
+			}
+		}
+	}
 	return &rolev1.AssignUserRoleResponse{}, nil
 }
 
@@ -184,6 +217,13 @@ func (s *RoleServer) RemoveUserRole(ctx context.Context, req *rolev1.RemoveUserR
 	}
 	if err := s.db.WithContext(ctx).Model(&u).Association("Roles").Delete(&role); err != nil {
 		return nil, status.Error(codes.Internal, "could not remove role")
+	}
+	if s.publisher != nil {
+		if err := s.publisher.PublishUserRoleRemoved(ctx, u.ID, role.ID); err != nil {
+			if e := kafkaPublishError("RemoveUserRole", err); e != nil {
+				return nil, e
+			}
+		}
 	}
 	return &rolev1.RemoveUserRoleResponse{}, nil
 }

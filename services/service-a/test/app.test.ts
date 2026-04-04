@@ -13,7 +13,9 @@ function deps(
       payload: Record<string, unknown>;
       createdUserId?: string;
     }) => Promise<void>;
-    listAuditLogs: () => Promise<
+    listAuditLogs: (
+      _q?: import("../src/app").AuditLogListQuery,
+    ) => Promise<
       {
         id: string;
         path: string;
@@ -74,6 +76,33 @@ describe("createApp", () => {
     expect(res.status).toBe(201);
     expect(res.body.id).toBe("id-1");
     expect(audits).toHaveLength(1);
+    expect(audits[0]).toMatchObject({
+      path: "/users",
+      method: "POST",
+      payload: expect.objectContaining({
+        kind: "user",
+        action: "create",
+        userId: "id-1",
+        username: "u",
+        email: "e@e.com",
+      }),
+      createdUserId: "id-1",
+    });
+  });
+
+  it("POST /users still 201 when audit write fails", async () => {
+    const app = createApp(
+      deps({
+        saveAuditLog: async () => {
+          throw new Error("mongo down");
+        },
+      }),
+    );
+    const res = await request(app)
+      .post("/users")
+      .send({ username: "u", email: "e@e.com" });
+    expect(res.status).toBe(201);
+    expect(res.body.id).toBe("id-1");
   });
 
   it("POST /users passes explicit password when provided including null coerced", async () => {
@@ -139,6 +168,7 @@ describe("createApp", () => {
   });
 
   it("maps other errors to 502", async () => {
+    let auditCalls = 0;
     const app = createApp(
       deps({
         grpc: {
@@ -146,12 +176,16 @@ describe("createApp", () => {
             throw new Error("boom");
           },
         },
+        saveAuditLog: async () => {
+          auditCalls += 1;
+        },
       }),
     );
     const res = await request(app)
       .post("/users")
       .send({ username: "u", email: "e@e.com" });
     expect(res.status).toBe(502);
+    expect(auditCalls).toBe(0);
   });
 
   it("maps non-ServiceError without message to 502", async () => {
@@ -224,6 +258,7 @@ describe("createApp", () => {
   });
 
   it("GET /users/:id maps other errors to 502", async () => {
+    let auditCalls = 0;
     const app = createApp(
       deps({
         grpc: {
@@ -231,10 +266,14 @@ describe("createApp", () => {
             throw new Error("upstream");
           },
         },
+        saveAuditLog: async () => {
+          auditCalls += 1;
+        },
       }),
     );
     const res = await request(app).get("/users/any");
     expect(res.status).toBe(502);
+    expect(auditCalls).toBe(0);
   });
 
   it("GET /users/:id maps non-user gRPC codes to 502", async () => {
@@ -254,9 +293,41 @@ describe("createApp", () => {
     expect(res.status).toBe(502);
   });
 
-  it("GET /audit-logs returns rows", async () => {
+  it("GET /audit-logs passes query params to listAuditLogs", async () => {
+    let got: import("../src/app").AuditLogListQuery | undefined;
     const app = createApp(
       deps({
+        grpc: {
+          me: async () => ({
+            user: { ...defaultGrpcUser, roles: ["admin"] },
+          }),
+        },
+        listAuditLogs: async (q) => {
+          got = q;
+          return [];
+        },
+      }),
+    );
+    await request(app)
+      .get("/audit-logs")
+      .set("Authorization", "Bearer t")
+      .query({ path: "/x", method: "GET", q: "needle", limit: "9999" });
+    expect(got).toEqual({
+      path: "/x",
+      method: "GET",
+      q: "needle",
+      limit: 500,
+    });
+  });
+
+  it("GET /audit-logs returns rows for admin", async () => {
+    const app = createApp(
+      deps({
+        grpc: {
+          me: async () => ({
+            user: { ...defaultGrpcUser, roles: ["admin"] },
+          }),
+        },
         listAuditLogs: async () => [
           {
             id: "1",
@@ -268,21 +339,54 @@ describe("createApp", () => {
         ],
       }),
     );
-    const res = await request(app).get("/audit-logs");
+    const res = await request(app)
+      .get("/audit-logs")
+      .set("Authorization", "Bearer t");
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(1);
     expect(res.body[0].path).toBe("/users");
   });
 
+  it("GET /audit-logs returns 401 without Authorization", async () => {
+    const app = createApp(deps());
+    const res = await request(app).get("/audit-logs");
+    expect(res.status).toBe(401);
+    expect(res.body.error).toBe("authentication required");
+  });
+
+  it("GET /audit-logs returns 403 for non-admin", async () => {
+    const app = createApp(
+      deps({
+        grpc: {
+          me: async () => ({
+            user: { ...defaultGrpcUser, roles: ["user"] },
+          }),
+        },
+      }),
+    );
+    const res = await request(app)
+      .get("/audit-logs")
+      .set("Authorization", "Bearer t");
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe("admin access required");
+  });
+
   it("GET /audit-logs maps errors to 500", async () => {
     const app = createApp(
       deps({
+        grpc: {
+          me: async () => ({
+            user: { ...defaultGrpcUser, roles: ["admin"] },
+          }),
+        },
         listAuditLogs: async () => {
           throw new Error("db down");
         },
       }),
     );
-    const res = await request(app).get("/audit-logs");
+    const res = await request(app)
+      .get("/audit-logs")
+      .set("Authorization", "Bearer t");
     expect(res.status).toBe(500);
     expect(res.body.error).toBe("failed to load audit logs");
   });
@@ -369,6 +473,42 @@ describe("createApp", () => {
     const res = await request(createApp(deps())).get("/users");
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
+  });
+
+  it("GET /users forwards q and role to grpc", async () => {
+    let filters: import("../src/grpcBackend").ListUsersFilters | undefined;
+    const app = createApp(
+      deps({
+        grpc: {
+          listUsers: async (_h, f) => {
+            filters = f;
+            return [defaultGrpcUser];
+          },
+        },
+      }),
+    );
+    const res = await request(app)
+      .get("/users")
+      .query({ q: "  jo  ", role: " admin " });
+    expect(res.status).toBe(200);
+    expect(filters).toEqual({ query: "jo", role: "admin" });
+  });
+
+  it("GET /roles forwards q to grpc", async () => {
+    let filters: import("../src/grpcBackend").ListRolesFilters | undefined;
+    const app = createApp(
+      deps({
+        grpc: {
+          listRoles: async (_h, f) => {
+            filters = f;
+            return [];
+          },
+        },
+      }),
+    );
+    const res = await request(app).get("/roles").query({ q: "  ed  " });
+    expect(res.status).toBe(200);
+    expect(filters).toEqual({ query: "ed" });
   });
 
   it("PATCH /users/:id", async () => {
@@ -510,5 +650,130 @@ describe("createApp", () => {
       .post("/users/u1/roles")
       .send({});
     expect(res.status).toBe(400);
+  });
+
+  it("writes audit on successful GET /users list", async () => {
+    const audits: unknown[] = [];
+    const app = createApp(
+      deps({
+        saveAuditLog: async (e) => {
+          audits.push(e);
+        },
+      }),
+    );
+    const res = await request(app).get("/users");
+    expect(res.status).toBe(200);
+    expect(audits).toEqual([
+      expect.objectContaining({
+        path: "/users",
+        method: "GET",
+        payload: {
+          kind: "user",
+          action: "list",
+          filters: { q: null, role: null },
+        },
+      }),
+    ]);
+  });
+
+  it("writes audit on successful GET /users/:id", async () => {
+    const audits: unknown[] = [];
+    const app = createApp(
+      deps({
+        saveAuditLog: async (e) => {
+          audits.push(e);
+        },
+      }),
+    );
+    const res = await request(app).get("/users/abc-123");
+    expect(res.status).toBe(200);
+    expect(audits[0]).toMatchObject({
+      path: "/users/abc-123",
+      method: "GET",
+      payload: { kind: "user", action: "get", userId: "abc-123" },
+    });
+  });
+
+  it("writes audit on PATCH /users/:id with field names only", async () => {
+    const audits: unknown[] = [];
+    const app = createApp(
+      deps({
+        saveAuditLog: async (e) => {
+          audits.push(e);
+        },
+      }),
+    );
+    const res = await request(app)
+      .patch("/users/u1")
+      .send({ username: "n", password: "secret" });
+    expect(res.status).toBe(200);
+    expect(audits[0]).toMatchObject({
+      path: "/users/u1",
+      method: "PATCH",
+      payload: {
+        kind: "user",
+        action: "update",
+        userId: "u1",
+        fields: ["username", "password"],
+      },
+    });
+  });
+
+  it("writes audit on role CRUD and user-role routes", async () => {
+    const audits: unknown[] = [];
+    const app = createApp(
+      deps({
+        grpc: {
+          listRoles: async () => [{ id: "r1", name: "admin" }],
+          createRole: async () => ({ id: "r-new", name: "editor" }),
+          getRole: async () => ({ id: "r1", name: "admin" }),
+          updateRole: async () => ({ id: "r1", name: "admin2" }),
+          deleteRole: async () => ({ id: "r1", name: "gone" }),
+        },
+        saveAuditLog: async (e) => {
+          audits.push(e);
+        },
+      }),
+    );
+    await request(app).get("/roles");
+    await request(app).post("/roles").send({ name: "editor" });
+    await request(app).get("/roles/r1");
+    await request(app).patch("/roles/r1").send({ name: "admin2" });
+    await request(app).delete("/roles/r1");
+    await request(app).post("/users/u1/roles").send({ roleId: "r1" });
+    await request(app).delete("/users/u1/roles/r1");
+    expect(audits.map((a) => (a as { payload: { action: string } }).payload.action)).toEqual([
+      "list",
+      "create",
+      "get",
+      "update",
+      "delete",
+      "assign",
+      "remove",
+    ]);
+  });
+
+  it("writes audit on auth register and login", async () => {
+    const audits: unknown[] = [];
+    const app = createApp(
+      deps({
+        saveAuditLog: async (e) => {
+          audits.push(e);
+        },
+      }),
+    );
+    await request(app)
+      .post("/auth/register")
+      .send({ username: "a", email: "a@a.com", password: "password12" });
+    await request(app).post("/auth/login").send({ username: "u", password: "p" });
+    expect(audits).toHaveLength(2);
+    expect(audits[0]).toMatchObject({
+      path: "/auth/register",
+      payload: expect.objectContaining({ kind: "auth", action: "register" }),
+    });
+    expect(audits[1]).toMatchObject({
+      path: "/auth/login",
+      payload: expect.objectContaining({ kind: "auth", action: "login" }),
+    });
   });
 });

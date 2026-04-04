@@ -63,7 +63,51 @@ type mockPublisher struct {
 	err   error
 }
 
-func (m *mockPublisher) PublishUserCreated(ctx context.Context, userID, username, email string) error {
+func (m *mockPublisher) PublishUserCreated(ctx context.Context, userID, username, email, _ string) error {
+	m.calls++
+	return m.err
+}
+func (m *mockPublisher) PublishUserUpdated(context.Context, string, string, string) error {
+	m.calls++
+	return m.err
+}
+func (m *mockPublisher) PublishUserDeleted(context.Context, string, string, string) error {
+	m.calls++
+	return m.err
+}
+func (m *mockPublisher) PublishAuthLogin(context.Context, string, string) error {
+	m.calls++
+	return m.err
+}
+func (m *mockPublisher) PublishAuthLogout(context.Context, string) error {
+	m.calls++
+	return m.err
+}
+func (m *mockPublisher) PublishAuthPasswordResetRequested(context.Context, string) error {
+	m.calls++
+	return m.err
+}
+func (m *mockPublisher) PublishAuthPasswordResetCompleted(context.Context, string) error {
+	m.calls++
+	return m.err
+}
+func (m *mockPublisher) PublishRoleCreated(context.Context, string, string) error {
+	m.calls++
+	return m.err
+}
+func (m *mockPublisher) PublishRoleUpdated(context.Context, string, string) error {
+	m.calls++
+	return m.err
+}
+func (m *mockPublisher) PublishRoleDeleted(context.Context, string, string) error {
+	m.calls++
+	return m.err
+}
+func (m *mockPublisher) PublishUserRoleAssigned(context.Context, string, string) error {
+	m.calls++
+	return m.err
+}
+func (m *mockPublisher) PublishUserRoleRemoved(context.Context, string, string) error {
 	m.calls++
 	return m.err
 }
@@ -84,7 +128,7 @@ func dialUserClient(t *testing.T, lis *bufconn.Listener) userv1.UserServiceClien
 	return userv1.NewUserServiceClient(conn)
 }
 
-func startUserServer(t *testing.T, db *gorm.DB, pub UserEventPublisher) (*bufconn.Listener, *grpc.Server) {
+func startUserServer(t *testing.T, db *gorm.DB, pub DomainEventPublisher) (*bufconn.Listener, *grpc.Server) {
 	t.Helper()
 	signer := auth.NewJWTSigner("test-secret", "", "")
 	lis := bufconn.Listen(bufSize)
